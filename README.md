@@ -1,54 +1,25 @@
-# LeetUP — CS3249 Assignment 1 Prototype
+# LeetUP
 
-## Prototyping method
+LeetUP helps computing students practise explaining algorithmic decisions. In a guided conversation about a coding problem, learners propose an approach, justify it, consider correctness and edge cases, and explain its time and space costs. LeetUP asks follow-up questions and offers progressively stronger hints when needed. The current problem is [Two Sum](https://leetcode.com/problems/two-sum/); correct slower approaches are accepted when learners can explain them.
 
-LeetUP is a coded, interactive hybrid conversational and graphical interface built with React, TypeScript, and Vite.
+## Set up and run
 
-The prototype uses prepared conversations to demonstrate the intended learning interaction for a Two Sum-style problem. It includes a problem panel, conversation panel, and reasoning checklist.
+1. Install Node.js 22 or newer and run `npm install`.
+2. Copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` to your Anthropic API key.
+3. Run `npm run dev` and open the local URL printed in the terminal.
 
-## How to run
+LeetUP uses Anthropic's Messages API and Claude Sonnet 5.5 (`claude-sonnet-5-5`) by default. If you need a different Claude model, set `ANTHROPIC_MODEL` in `.env`. The local API server keeps the key out of browser code. `.env` is excluded from Git. To check a production build locally, run `npm run build` followed by `npm run preview`.
 
-Requirements: Node.js 24 LTS and npm. Internet access is required to install dependencies.
+## How it works
 
-1. Extract the ZIP and open a terminal in the `leetup` folder.
-2. Install dependencies:
+The learner is the person typing in the chat. For each learner message, LeetUP calls Claude once to assess the learner's reasoning. Its policy code checks the evidence and decides which area to address and how much help to give. A second Claude call writes LeetUP's next reply. The policy controls checklist completion and reference-code release. Once the required reasoning is demonstrated, LeetUP offers reference code for the learner's selected approach.
 
-   ```bash
-   npm install
-   ```
+- `src/data/problemBank.ts`: Two Sum statement, constraints, approach examples, hints, and reference solutions.
+- `src/lib/llmProvider.ts`: assessment and reply prompts.
+- `src/lib/policy.ts`: evidence validation, hint sequence, and tutoring decisions.
+- `src/lib/session.ts` and `src/lib/applyDecision.ts`: checklist and session state.
+- `src/lib/summary.ts`: feedback and matching reference code.
+- `src/lib/llmClient.ts`: browser requests to the local API.
+- `server/api.mjs`: local API that calls Anthropic.
 
-3. Start the prototype:
-
-   ```bash
-   npm run dev
-   ```
-
-4. Open the local address displayed in the terminal, normally `http://localhost:5173`.
-
-No API key or `.env` file is required. The submitted demonstration runs in scripted mode by default.
-
-## How to demonstrate
-
-1. Choose a scenario using the **Demo** dropdown.
-2. Click **Start** if the opening screen is displayed.
-3. Click **Next demo line** above the message input to submit each prepared learner response.
-4. Read the tutor’s reply and observe changes to the reasoning checklist.
-5. Continue to the feedback summary and optional reference code.
-
-Scenario B demonstrates a complete interaction with progressive support. Scenarios A and C demonstrate alternative learner situations.
-
-| Scenario | What it demonstrates |
-|---|---|
-| **A — An existing approach** | The learner proposes a hash map. Follow-up questions draw out their reasoning, correctness, edge cases, and complexity. |
-| **B — An uncertain start** | The learner receives small questions, light and stronger hints, and a guided explanation when needed. Feedback records where support was provided. |
-| **C — Repairing an approach** | The learner proposes sorting but loses the original indices. The tutor helps them repair their own approach rather than requiring a hash-map solution. |
-
-The reasoning checklist represents areas of reasoning, not a mandatory order of questions. The prepared scenarios illustrate the intended progression.
-
-## Prototype scope
-
-The demonstration uses scripted responses rather than live LLM assessment. Use **Next demo line** to follow each scenario; unrecognised input produces a demo notice without advancing the conversation.
-
-Optional LLM-related code is included, but configuring it is not required to review this prototype.
-
-Voice input, code execution, and progress tracking across sessions are not implemented.
+Run `npm run build`, `npm run lint`, and `npm run simulate` to check the implementation.

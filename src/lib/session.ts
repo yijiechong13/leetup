@@ -47,10 +47,7 @@ const emptyRecord = <T>(make: () => T): Record<ReasoningAreaId, T> =>
     T
   >
 
-export function createSession(
-  problemId = defaultProblemId,
-  scenarioId: string | null = null,
-): SessionState {
+export function createSession(problemId = defaultProblemId): SessionState {
   return {
     problemId,
     started: false,
@@ -65,8 +62,6 @@ export function createSession(
     turn: 0,
     learnerResponses: [],
     messages: [],
-    scenarioId,
-    scenarioStep: 0,
   }
 }
 
@@ -135,7 +130,7 @@ export interface EvidenceUpdate {
   status: AreaEvidence['status']
   quote?: string
   gap?: string | null
-  /** Overrides the support level derived from attention (scripted demos). */
+  /** Allows a known support level when restoring a session. */
   support?: SupportLevel
 }
 

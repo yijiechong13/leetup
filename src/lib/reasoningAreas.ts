@@ -67,14 +67,7 @@ export const REASONING_AREAS: ReasoningArea[] = [
     id: 'justification',
     label: 'Justification',
     goal: 'Why that approach is a reasonable choice here.',
-    /*
-     * Asked whenever it is still open (it stays in the focus priority list),
-     * but it does not gate completion: a learner who has explained a working
-     * approach, tested it, and accounted for its cost has done the core
-     * activity. Requiring a separate "and why is that good?" turn on top would
-     * be the fixed-syllabus habit this design removes.
-     */
-    necessity: 'situational',
+    necessity: 'core',
     openQuestion: 'What makes that a good choice for this problem?',
     focusedQuestion:
       'What does that approach buy you compared with the most obvious thing you could do?',

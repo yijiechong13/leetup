@@ -12,13 +12,11 @@ import { StatusChip, StatusDot, statusTextClass } from './StatusBadge'
 export function ReasoningChecklist({
   items,
   approachName,
-  complete,
   coreDone,
   coreTotal,
 }: {
   items: ChecklistItem[]
   approachName: string | null
-  complete: boolean
   coreDone: number
   coreTotal: number
 }) {
@@ -37,9 +35,6 @@ export function ReasoningChecklist({
         >
           Reasoning path
         </h2>
-        <span className="ml-auto text-[12px] text-ink-faint">
-          {coreDone}/{coreTotal}
-        </span>
       </header>
 
       <div className="px-4 pt-3">
@@ -49,16 +44,11 @@ export function ReasoningChecklist({
             style={{ width: `${pct}%` }}
           />
         </div>
-        <p className="mt-2 text-[12px] leading-4 text-ink-faint">
-          {approachName ? (
-            <>
-              Your approach:{' '}
-              <span className="font-medium text-ink-soft">{approachName}</span>
-            </>
-          ) : (
-            'Your approach: not chosen yet'
-          )}
-        </p>
+        {approachName && (
+          <p className="mt-2 text-[12px] leading-4 text-ink-faint">
+            Your approach: <span className="font-medium text-ink-soft">{approachName}</span>
+          </p>
+        )}
       </div>
 
       <ol className="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-3">
@@ -104,21 +94,6 @@ export function ReasoningChecklist({
         ))}
       </ol>
 
-      <footer className="border-t border-line px-4 py-3 text-[12px] leading-5 text-ink-faint">
-        {complete ? (
-          <p>
-            Core reasoning complete. “With help” marks an area I explained rather
-            than one you derived — this session's record, not a claim about what
-            you can do unaided next time.
-          </p>
-        ) : (
-          <p>
-            Areas fill in as you explain your reasoning, and one response can
-            cover several. “With help” marks an area I explained rather than one
-            you worked out.
-          </p>
-        )}
-      </footer>
     </section>
   )
 }

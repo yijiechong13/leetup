@@ -35,22 +35,20 @@ export function ProblemPanel({ problem }: { problem: CuratedProblem }) {
 
         <p className="mt-3 text-[14px] leading-6 text-ink-soft">{problem.statement}</p>
 
-        <h4 className="mt-5 text-[13px] font-semibold text-ink">Example</h4>
-        <div className="mt-2 rounded-md bg-canvas px-3 py-2.5 font-mono text-[12.5px] leading-6 text-ink-soft">
-          <div>
-            <span className="text-ink-faint">Input: </span>
-            {problem.example.input}
-          </div>
-          <div>
-            <span className="text-ink-faint">Output: </span>
-            {problem.example.output}
-          </div>
-          {problem.example.explanation && (
-            <div className="mt-1 font-sans text-[12.5px] text-ink-faint">
-              {problem.example.explanation}
+        {problem.examples.map((example, index) => (
+          <div key={index}>
+            <h4 className="mt-5 text-[13px] font-semibold text-ink">Example {index + 1}</h4>
+            <div className="mt-2 rounded-md bg-canvas px-3 py-2.5 font-mono text-[12.5px] leading-6 text-ink-soft">
+              <div><span className="text-ink-faint">Input: </span>{example.input}</div>
+              <div><span className="text-ink-faint">Output: </span>{example.output}</div>
+              {example.explanation && (
+                <div className="mt-1 font-sans text-[12.5px] text-ink-faint">
+                  {example.explanation}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        ))}
 
         <h4 className="mt-5 text-[13px] font-semibold text-ink">Constraints</h4>
         <ul className="mt-2 space-y-1.5">
@@ -65,11 +63,12 @@ export function ProblemPanel({ problem }: { problem: CuratedProblem }) {
           ))}
         </ul>
 
-        <p className="mt-6 border-t border-line pt-3 text-[12px] leading-5 text-ink-faint">
-          Curated LeetCode-style problem from LeetUP's local problem bank — nothing is
-          fetched from LeetCode. The panel stays pinned so you never have to scroll the
-          conversation to re-read the question.
-        </p>
+        {problem.followUp && (
+          <>
+            <h4 className="mt-5 text-[13px] font-semibold text-ink">Follow-up</h4>
+            <p className="mt-2 text-[13.5px] leading-6 text-ink-soft">{problem.followUp}</p>
+          </>
+        )}
       </div>
     </section>
   )

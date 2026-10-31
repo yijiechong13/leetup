@@ -1,11 +1,9 @@
 import type { CuratedProblem } from '../types'
 
 /**
- * Curated problem bank.
- *
- * LeetUP deliberately does NOT integrate with LeetCode or fetch anything at
- * runtime. These are curated, LeetCode-style problems written for this
- * prototype.
+ * Problem data shown to learners and supplied to the tutor.
+ * Two Sum's statement and examples follow the LeetCode problem. The app keeps
+ * a local copy so the tutor can use reviewed constraints and approach notes.
  *
  * `validApproaches` carries the weight. Each entry is a *reference example* of
  * an approach family — not a whitelist of acceptable answers — and each one
@@ -20,18 +18,31 @@ export const problemBank: CuratedProblem[] = [
     title: 'Two Sum',
     difficulty: 'Easy',
     statement:
-      'Given an array of integers nums and an integer target, return the indices of two numbers such that they add up to target. You may assume each input has exactly one solution, and you may not use the same element twice.',
-    example: {
-      input: 'nums = [2, 7, 11, 15], target = 9',
-      output: '[0, 1]',
-      explanation: 'nums[0] + nums[1] == 9, so the answer is [0, 1].',
-    },
+      'You are given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. You may assume that each input would have exactly one solution, and you may not use the same element twice. You can return the answer in any order.',
+    examples: [
+      {
+        input: 'nums = [2,7,11,15], target = 9',
+        output: '[0,1]',
+        explanation: 'The sum of nums[0] and nums[1] is 2 + 7 = 9, which equals the target. Therefore, the indices [0, 1] are returned.',
+      },
+      {
+        input: 'nums = [3,2,4], target = 6',
+        output: '[1,2]',
+        explanation: 'The sum of nums[1] and nums[2] is 2 + 4 = 6, which equals the target. Therefore, the indices [1, 2] are returned.',
+      },
+      {
+        input: 'nums = [3,3], target = 6',
+        output: '[0,1]',
+        explanation: 'The sum of nums[0] and nums[1] is 3 + 3 = 6, which equals the target. Therefore, the indices [0, 1] are returned.',
+      },
+    ],
     constraints: [
       '2 <= nums.length <= 10^4',
       '-10^9 <= nums[i] <= 10^9',
       '-10^9 <= target <= 10^9',
-      'Exactly one valid answer exists.',
+      'Only one valid answer exists.',
     ],
+    followUp: 'Can you come up with an algorithm that is less than O(n^2) time complexity?',
     metadata: {
       validApproaches: [
         {

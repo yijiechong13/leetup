@@ -94,7 +94,10 @@ function problemBlock(problem: CuratedProblem): string {
   return [
     `Problem: ${problem.title} (${problem.difficulty})`,
     problem.statement,
+    ...problem.examples.map((example, index) =>
+      `Example ${index + 1}: ${example.input}; output ${example.output}. ${example.explanation ?? ''}`),
     `Constraints: ${problem.constraints.join('; ')}`,
+    problem.followUp ? `Optional follow-up: ${problem.followUp}` : '',
     `Requirements that constrain a solution: ${problem.metadata.keyRequirements.join('; ')}`,
     `Edge cases worth testing: ${problem.metadata.edgeCases.join('; ')}`,
     `Common misconceptions: ${problem.metadata.commonMisconceptions.join('; ')}`,
@@ -133,10 +136,18 @@ export function buildAssessmentPrompt(state: SessionState): string {
     '  "Use a hash map" alone demonstrates nothing; "store each value with its',
     '  index as I go so I can look up the complement" explains an approach.',
     '- Repeating something the tutor just said is not the learner demonstrating',
-    '  it. Check the conversation below before crediting.',
-    '- Stating a complexity is evidence for `complexity` only. It is NOT',
-    '  evidence that the approach is correct, and a complexity that matches a',
-    '  known approach does not prove the learner is using it.',
+    '  it. Check the conversation below before crediting. After guidance,',
+    '  require the learner to apply the idea to an example or explain it in',
+    '  their own words.',
+    '- Credit `complexity` only when the learner gives both time and extra',
+    '  space costs AND explains what operations and storage cause those costs.',
+    '  A bare Big-O label is partial, not adequate.',
+    '- Credit `justification` only when the learner explains why their chosen',
+    '  structure or algorithm fits this problem. A name or generic praise is',
+    '  partial, not adequate.',
+    '- Credit `correctness` only when the learner explains why the approach',
+    '  returns the required result and considers a relevant edge case. A single',
+    '  successful example alone is partial, not adequate.',
     '- Mark `adequate: false` when an area is touched on but incomplete.',
     '',
     'Judging approaches:',
@@ -144,6 +155,8 @@ export function buildAssessmentPrompt(state: SessionState): string {
     '  approaches to this problem. Do not treat a non-hash-map approach as a',
     '  mistake, and do not push the learner towards a different one.',
     '- Correctness, efficiency and suitability are separate judgements.',
+    '- The less-than-O(n^2) follow-up is optional. A correct, justified',
+    '  nested-loop solution completes the main task.',
     '- If the approach is one you cannot place, set approach.unfamiliar: true',
     '  and needsClarification: true instead of guessing.',
     '',
@@ -281,7 +294,7 @@ async function assess(state: SessionState, userMessage: string) {
       { role: 'system', content: buildAssessmentPrompt(state) },
       { role: 'user', content: userMessage },
     ],
-    { temperature: 0, maxTokens: 700 },
+    { maxTokens: 2000 },
   )
   return validateAssessment(extractJson(raw), userMessage)
 }
@@ -297,7 +310,7 @@ async function generate(
       { role: 'system', content: buildGenerationPrompt(state, decision, assessment) },
       { role: 'user', content: userMessage },
     ],
-    { temperature: 0.6, maxTokens: 300 },
+    { maxTokens: 800 },
   )
 }
 
@@ -340,7 +353,7 @@ export const llmProvider: ResponseProvider = {
     /** Nothing recorded, no ladder movement, session preserved. */
     const recover = (why: unknown): ReturnType<typeof buildRecovery> => {
       console.error('[LeetUP] assessment unusable — recovering:', why)
-      return buildRecovery(withLearner)
+      return buildRecovery(withLearner, why)
     }
 
     let validated
@@ -477,11 +490,13 @@ export const llmProvider: ResponseProvider = {
  * evidence record, the approach and the support ladder are untouched: a model
  * or network failure is not the learner failing.
  */
-function buildRecovery(state: SessionState) {
+function buildRecovery(state: SessionState, reason: unknown) {
   const decision = recoveryDecision(state)
   const notice = createMessage(
     'assistant',
-    RECOVERY_NOTICE,
+    typeof reason === 'string' && reason.includes('ANTHROPIC_API_KEY')
+      ? 'Tutor unavailable. Add ANTHROPIC_API_KEY to .env and restart the app.'
+      : RECOVERY_NOTICE,
     transcriptArea(decision.focusArea),
     'notice',
   )

@@ -7,26 +7,22 @@ import { ResizeHandle } from './components/ResizeHandle'
 import { ThemeToggle } from './components/ThemeToggle'
 import { useTheme } from './lib/theme'
 import { usePanelSizes } from './lib/usePanelSizes'
-import { ScenarioPicker } from './components/ScenarioPicker'
 import { getProblem } from './data/problemBank'
 import {
   coreProgress,
   createSession,
   getChecklist,
-  progressLabel,
   startSession,
 } from './lib/session'
-import { DEFAULT_SCENARIO_ID, getScenario } from './lib/scenarios'
-import { activeProvider, providerMode } from './lib/responseProvider'
+import { activeProvider } from './lib/responseProvider'
 import type { SessionState } from './types'
 
 /** Small pause so the turn-taking reads as a conversation, not a form submit. */
 const THINKING_MS = 420
 
 export default function App() {
-  const scripted = providerMode === 'scripted'
   const [state, setState] = useState<SessionState>(() =>
-    createSession(undefined, scripted ? DEFAULT_SCENARIO_ID : null),
+    startSession(createSession()).updatedState,
   )
   const [thinking, setThinking] = useState(false)
   const { theme, setTheme } = useTheme()
@@ -61,23 +57,9 @@ export default function App() {
   const problem = useMemo(() => getProblem(state.problemId), [state.problemId])
   const checklist = useMemo(() => getChecklist(state), [state])
   const progress = useMemo(() => coreProgress(state), [state])
-  /* In demo mode the next scripted line is offered as a one-click reply, so the
-     walkthrough is usable without copying text out of the README. */
-  const scriptedNextInput = useMemo(
-    () =>
-      scripted && state.started
-        ? (getScenario(state.scenarioId).beats[state.scenarioStep]?.input ?? null)
-        : null,
-    [scripted, state.started, state.scenarioId, state.scenarioStep],
-  )
-
-  const handleStart = () => setState((s) => startSession(s).updatedState)
 
   const handleSend = async (text: string) => {
     setThinking(true)
-    // The provider is async because it may be an LLM call: responseProvider.ts
-    // picks the LLM or scripted implementation, and this component neither
-    // knows nor cares which one answered.
     const result = await activeProvider.getNextResponse(state, text)
     window.setTimeout(() => {
       setState(result.updatedState)
@@ -86,13 +68,7 @@ export default function App() {
   }
 
   const handleReset = () => {
-    setState(createSession(state.problemId, state.scenarioId))
-    setThinking(false)
-  }
-
-  /** Switching demo scenario restarts the session: the scripts are distinct. */
-  const handleScenario = (scenarioId: string) => {
-    setState(startSession(createSession(state.problemId, scenarioId)).updatedState)
+    setState(startSession(createSession(state.problemId)).updatedState)
     setThinking(false)
   }
 
@@ -104,28 +80,16 @@ export default function App() {
             <h1 className="text-[17px] font-semibold tracking-tight text-ink">
               Leet<span className="text-accent">UP</span>
             </h1>
-            <p className="hidden text-[13px] text-ink-soft sm:block">
-              Think before you solve.
-            </p>
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-[12px] text-ink-faint md:inline">
-              {progress.done}/{progress.total} areas explained
-            </span>
-            {scripted && (
-              <ScenarioPicker
-                value={state.scenarioId ?? DEFAULT_SCENARIO_ID}
-                onChange={handleScenario}
-              />
-            )}
             <ThemeToggle theme={theme} onChange={setTheme} />
             <button
               onClick={handleReset}
               className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-[12.5px] text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
             >
               <RotateCcw className="size-3.5" />
-              Reset demo
+              Reset session
             </button>
           </div>
         </div>
@@ -158,12 +122,7 @@ export default function App() {
           <ChatPanel
             messages={state.messages}
             onSend={handleSend}
-            onStart={handleStart}
-            started={state.started}
             thinking={thinking}
-            stageLabel={progressLabel(state)}
-            scripted={scripted}
-            scriptedNextInput={scriptedNextInput}
           />
         </div>
 
@@ -185,7 +144,6 @@ export default function App() {
             <ReasoningChecklist
               items={checklist}
               approachName={state.selectedApproach?.name ?? null}
-              complete={state.phase === 'complete'}
               coreDone={progress.done}
               coreTotal={progress.total}
             />

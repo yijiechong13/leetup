@@ -1,36 +1,12 @@
-/**
- * Offline test harness (not part of the app bundle).
- * Run: npx tsx scripts/simulate.ts   (or `npm run simulate`)
- *
- * Three halves, none of which needs an API key:
- *
- *   1. POLICY      — the controller driven with hand-written assessments
- *                    standing in for the model's reading. This is where the
- *                    pedagogy is actually asserted, because these rules must
- *                    hold whatever the model says.
- *   2. EVIDENCE    — the quote-checking that decides what counts as evidence.
- *   3. SCENARIOS   — all three scripted demos replayed end to end through the
- *                    real provider, checking the record they produce.
- */
+/** Offline checks of policy, evidence, and completion rules. */
 import type { ReasoningAreaId, SessionState } from '../src/types'
 import { getProblem } from '../src/data/problemBank'
-import {
-  createSession,
-  getChecklist,
-  isCoreComplete,
-  startSession,
-} from '../src/lib/session'
-import {
-  applyPolicy,
-  quoteSupports,
-  validateAssessment,
-  type Assessment,
-  type TutorAction,
-} from '../src/lib/policy'
+import { createSession, isCoreComplete, startSession } from '../src/lib/session'
+import { applyPolicy, quoteSupports, validateAssessment, type Assessment, type TutorAction } from '../src/lib/policy'
 import { applyDecision } from '../src/lib/applyDecision'
-import { scriptedProvider } from '../src/lib/scriptedProvider'
-import { SCENARIOS } from '../src/lib/scenarios'
-import { buildSummaryText } from '../src/lib/summary'
+import { CORE_AREAS } from '../src/lib/reasoningAreas'
+import { referenceFor } from '../src/lib/summary'
+
 
 const problem = getProblem('two-sum')
 
@@ -470,207 +446,9 @@ function evidenceChecks() {
   }
 }
 
-/* ------------------------------------------------------------------ *
- * 3. Scripted scenarios, replayed end to end
- * ------------------------------------------------------------------ */
 
-async function scenarioChecks() {
-  section('SCRIPTED SCENARIOS')
-
-  for (const scenario of SCENARIOS) {
-    console.log(`\n${scenario.label}`)
-    let state = startSession(createSession('two-sum', scenario.id)).updatedState
-
-    for (const beat of scenario.beats) {
-      const result = await scriptedProvider.getNextResponse(state, beat.input)
-      state = result.updatedState
-      const offScript = result.assistantMessages.some((m) => m.kind === 'notice')
-      if (offScript) {
-        failures++
-        checks++
-        console.log(`  FAIL  beat went off script: "${beat.input.slice(0, 50)}…"`)
-      }
-    }
-
-    check(`${scenario.id}: core reasoning complete`, isCoreComplete(state), true)
-    check(`${scenario.id}: session marked complete`, state.phase, 'complete')
-
-    const summary = buildSummaryText(state, problem)
-    const approach = state.selectedApproach?.name ?? ''
-    truthy(`${scenario.id}: an approach was recorded`, approach.length > 0)
-    truthy(`${scenario.id}: the summary names that approach`, summary.includes(approach))
-
-    /* Scenario-specific expectations. */
-    if (scenario.id === 'A') {
-      check('A: approach is the hash map', approach, 'Hash map lookup')
-      check(
-        'A: everything was independent',
-        getChecklist(state)
-          .filter((i) => i.status === 'supported')
-          .map((i) => i.id),
-        [],
-      )
-      truthy(
-        'A: no brute-force detour was imposed',
-        !state.messages.some(
-          (m) => m.role === 'assistant' && /brute|every pair/i.test(m.text),
-        ),
-      )
-    }
-
-    if (scenario.id === 'B') {
-      check('B: approach is nested loops', approach, 'Nested loops')
-      truthy(
-        'B: complexity feedback is quadratic, not O(n)',
-        summary.includes('O(n^2)') && !summary.includes('O(n) time'),
-      )
-      check(
-        'B: correctness is recorded as reached with guidance',
-        state.evidence.correctness.support,
-        'after-guidance',
-      )
-      truthy(
-        'B: the summary says which areas needed help',
-        /checklist records where you needed help/.test(summary),
-      )
-      truthy(
-        'B: a guided explanation was actually delivered',
-        state.messages.some((m) => m.kind === 'reveal'),
-      )
-    }
-
-    if (scenario.id === 'C') {
-      check('C: sorting with index tracking is accepted', approach, 'Sorting with original-index tracking')
-      truthy(
-        'C: complexity feedback is O(n log n), not the hash map figure',
-        summary.includes('O(n log n)'),
-      )
-      truthy(
-        'C: the learner was never pushed to switch approach',
-        !state.messages.some(
-          (m) =>
-            m.role === 'assistant' &&
-            /you should use a hash map|use a hash map instead/i.test(m.text),
-        ),
-      )
-      truthy(
-        'C: the reference implementation is the sorting one',
-        state.messages.some((m) => m.text.includes('pairs = sorted')),
-      )
-    }
-  }
-
-  console.log('\nOff-script input is not scored:')
-  {
-    let state = startSession(createSession('two-sum', 'A')).updatedState
-    const before = JSON.stringify(state.evidence)
-    const result = await scriptedProvider.getNextResponse(
-      state,
-      'what is the weather like today',
-    )
-    state = result.updatedState
-    truthy(
-      'the reply is labelled as demo mode',
-      result.assistantMessages.some((m) => m.kind === 'notice'),
-    )
-    check('no evidence was recorded', JSON.stringify(state.evidence), before)
-    check('the scenario did not advance', state.scenarioStep, 0)
-  }
-
-  console.log('\nA reference implementation is never substituted:')
-  {
-    const state = {
-      ...startSession(createSession('two-sum', 'A')).updatedState,
-      selectedApproach: {
-        name: 'Sorting without preserving original indices',
-        recognised: true,
-        changedFrom: null,
-        selectedAtTurn: 0,
-      },
-    }
-    const { referenceFor, referenceUnavailableMessage } = await import(
-      '../src/lib/summary'
-    )
-    check('no code offered for an incorrect approach', referenceFor(state, problem), null)
-    truthy(
-      'and the tutor says so plainly',
-      /do not have a reference implementation/.test(
-        referenceUnavailableMessage(state, problem),
-      ),
-    )
-  }
-}
-
-/* ------------------------------------------------------------------ *
- * 4. Regressions — each of these reproduced a real observed failure
- * ------------------------------------------------------------------ */
-
-async function regressionChecks() {
+function regressionChecks() {
   section('REGRESSIONS')
-
-  /* --- 1. Scripted matching was permissive enough to accept nonsense ---- */
-  console.log('\n[1] Scripted mode accepts only the scripted line:')
-  {
-    const fresh = () => startSession(createSession('two-sum', 'A')).updatedState
-    const first = SCENARIOS[0].beats[0].input
-
-    const run = async (message: string) => {
-      const r = await scriptedProvider.getNextResponse(fresh(), message)
-      return {
-        step: r.updatedState.scenarioStep,
-        approach: r.updatedState.evidence.approach.status,
-        justification: r.updatedState.evidence.justification.status,
-        notice: r.assistantMessages.some((m) => m.kind === 'notice'),
-        quote: r.updatedState.evidence.approach.quotes[0],
-      }
-    }
-
-    const exact = await run(first)
-    check('exact line is accepted', exact.step, 1)
-
-    const formatting = await run(
-      `  ${first.replace(/'/g, '\u2019').toUpperCase()}  `,
-    )
-    check('case, spacing and curly apostrophes are accepted', formatting.step, 1)
-
-    const bare = await run('map')
-    check('bare "map" does not advance', bare.step, 0)
-    check('bare "map" credits no approach', bare.approach, 'unaddressed')
-    check('bare "map" credits no justification', bare.justification, 'unaddressed')
-    truthy('bare "map" gets a demo-mode notice', bare.notice)
-
-    const unrelated = await run('what is the weather like today')
-    check('unrelated input does not advance', unrelated.step, 0)
-    truthy('unrelated input gets a notice', unrelated.notice)
-
-    const contradictory = await run(
-      "I would not walk the array and I do not keep a map from each value I've seen to its index",
-    )
-    check('a negated sentence full of script words is rejected', contradictory.step, 0)
-    check('and credits nothing', contradictory.approach, 'unaddressed')
-
-    /* Quotes must come from the submitted message, not the canonical script. */
-    const variantBeat = SCENARIOS[1].beats[0]
-    let bState = startSession(createSession('two-sum', 'B')).updatedState
-    const variant = (variantBeat.accepts ?? [])[1]
-    const rv = await scriptedProvider.getNextResponse(bState, variant)
-    check('an authored variant is accepted', rv.updatedState.scenarioStep, 1)
-
-    /* Scenario C beat 3 carries quotes; submit it via its canonical line and
-       confirm the recorded quote is text the learner actually sent. */
-    let cState = startSession(createSession('two-sum', 'C')).updatedState
-    for (const beat of SCENARIOS[2].beats.slice(0, 3)) {
-      const r = await scriptedProvider.getNextResponse(cState, beat.input)
-      cState = r.updatedState
-    }
-    const recorded = cState.evidence.correctness.quotes[0]
-    truthy(
-      'recorded quotes appear in the learner message that produced them',
-      SCENARIOS[2].beats[2].input.toLowerCase().includes(recorded.toLowerCase()),
-    )
-  }
-
-  /* --- 2. Changing approach kept evidence for the old one -------------- */
   console.log('\n[2] Changing approach invalidates approach-dependent evidence:')
   {
     const hashed = () => {
@@ -870,68 +648,35 @@ async function regressionChecks() {
     check('and it leaves the deferred list', resolved.deferredAreas.includes('correctness'), false)
   }
 
-  /* --- 5. Scenario C credited a question as understanding -------------- */
-  console.log('\n[5] Asking a question is not demonstrating the answer:')
-  {
-    const scenarioC = SCENARIOS[2]
-    let state = startSession(createSession('two-sum', 'C')).updatedState
-    const askIndex = scenarioC.beats.findIndex((b) =>
-      b.input.startsWith('would a hash map'),
-    )
-    for (const beat of scenarioC.beats.slice(0, askIndex + 1)) {
-      const r = await scriptedProvider.getNextResponse(state, beat.input)
-      state = r.updatedState
-    }
-    check(
-      'the question itself credits nothing',
-      state.evidence.comparison.status,
-      'unaddressed',
-    )
+}
 
-    const follow = await scriptedProvider.getNextResponse(
-      state,
-      scenarioC.beats[askIndex + 1].input,
-    )
-    state = follow.updatedState
-    check(
-      'the follow-up explanation is credited',
-      state.evidence.comparison.status,
-      'demonstrated',
-    )
-    check(
-      'as supported, since the tutor supplied it',
-      state.evidence.comparison.support,
-      'after-guidance',
-    )
-
-    const tutorText = state.messages.map((m) => m.text).join('\n')
-    truthy(
-      'the O(1)-space claim is scoped to an already-sorted input',
-      /already.{0,3} sorted/i.test(tutorText) && /O\(1\) extra space/.test(tutorText),
-    )
-    truthy(
-      'and the pairs array is named as the O(n) cost',
-      /pairs you build|pairs array/i.test(tutorText),
-    )
+function completionRuleChecks() {
+  section('FOUR-AREA COMPLETION')
+  check('required reasoning areas', CORE_AREAS, [
+    'approach', 'justification', 'correctness', 'complexity',
+  ])
+  const withoutJustification = demonstrate(sessionWith(), [
+    'approach', 'correctness', 'complexity',
+  ])
+  check('justification blocks completion', isCoreComplete(withoutJustification), false)
+  check('justification is the next focus',
+    applyPolicy(withoutJustification, assessment(), problem).focusArea,
+    'justification')
+  const bruteForce = {
+    ...demonstrate(sessionWith(), CORE_AREAS),
+    selectedApproach: {
+      name: 'Nested loops', recognised: true, changedFrom: null, selectedAtTurn: 1,
+    },
   }
+  check('correct brute force is complete', isCoreComplete(bruteForce), true)
+  check('brute force receives its own reference',
+    referenceFor(bruteForce, problem)?.name, 'Nested loops')
 }
 
-/* ------------------------------------------------------------------ *
- * Run
- * ------------------------------------------------------------------ */
-
-async function main() {
-  policyChecks()
-  evidenceChecks()
-  await scenarioChecks()
-  await regressionChecks()
-
-  console.log(
-    failures === 0
-      ? `\nAll ${checks} checks passed.`
-      : `\n${failures} of ${checks} checks FAILED.`,
-  )
-  if (failures > 0) process.exitCode = 1
-}
-
-main()
+policyChecks()
+evidenceChecks()
+regressionChecks()
+completionRuleChecks()
+console.log(failures === 0 ? `\nAll ${checks} checks passed.` :
+  `\n${failures} of ${checks} checks FAILED.`)
+if (failures > 0) process.exitCode = 1

@@ -107,8 +107,9 @@ export interface CuratedProblem {
   title: string
   difficulty: 'Easy' | 'Medium' | 'Hard'
   statement: string
-  example: { input: string; output: string; explanation?: string }
+  examples: { input: string; output: string; explanation?: string }[]
   constraints: string[]
+  followUp?: string
   metadata: {
     /**
      * Reference examples of approach families — NOT an exhaustive whitelist.
@@ -138,7 +139,7 @@ export interface ChatMessage {
     | 'feedback'
     | 'summary'
     | 'reveal'
-    /** A labelled out-of-band notice: demo mode, or an LLM failure. */
+    /** A labelled out-of-band notice for an LLM failure. */
     | 'notice'
 }
 
@@ -186,10 +187,6 @@ export interface SessionState {
   turn: number
   learnerResponses: { area: TranscriptArea; turn: number; text: string }[]
   messages: ChatMessage[]
-  /** Scripted demo scenario in play, or null in live LLM mode. */
-  scenarioId: string | null
-  /** Position within that scenario. */
-  scenarioStep: number
 }
 
 export interface EngineResult {
