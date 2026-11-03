@@ -61,7 +61,8 @@ function MessageBody({ message }: { message: ChatMessage }) {
 
 const kindStyle: Record<string, string> = {
   hint: 'border-hint/40 bg-hint-soft',
-  reveal: 'border-hint/40 bg-hint-soft',
+  /* Reference code is earned on completion; it must not look like a hint. */
+  reveal: 'border-accent/40 bg-accent-soft',
   repair: 'border-line bg-surface',
   summary: 'border-accent/40 bg-accent-soft',
   /* A failed model call is distinct from tutor speech. */

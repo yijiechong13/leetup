@@ -765,13 +765,17 @@ section('RUBRIC TUTORING AND PROGRESS')
   check('useful partial answer receives ordinary clarification', decision.action, 'clarify')
   check('useful partial answer receives no support rung', decision.assistanceRung, null)
   check('answer stays independently demonstrated so far', after.evidence.approach.support, 'independent')
-  check('progress resets question counter', after.attention.approach, 1)
+  check('first partial answer holds the question counter', after.attention.approach, 8)
   check('learner description is retained', after.selectedApproach?.description, parsed.assessment.approach.description)
   truthy('generation gets actual learner steps', buildGenerationPrompt(after, decision, parsed.assessment).includes('Build the whole map before a second scan'))
   check('assessment contains no curated solution list', buildAssessmentPrompt(after).includes('Reference approach families'), false)
   const active = { ...after, assistance: { ...after.assistance, approach: 2 } }
-  const continued = applyPolicy(active, { ...parsed.assessment, needsClarification: false }, problem)
-  check('progress after a hint returns to ordinary follow-up', continued.action, 'ask_focused')
+  const continued = applyPolicy(active, {
+    ...parsed.assessment,
+    needsClarification: false,
+    demonstrated: [{ area: 'approach', quote: 'Fill the map first, then scan again and return only when the found index differs from i.', adequate: true, confidence: 0.9 }],
+  }, problem)
+  check('progress after a hint returns to ordinary follow-up', continued.action, 'ask_open')
   check('ordinary follow-up does not escalate assistance', continued.assistanceRung, null)
   const next = applyDecision(active, continued, problem)
   check('previous support remains honestly recorded', next.evidence.approach.support, 'after-hints')
@@ -781,6 +785,43 @@ section('RUBRIC TUTORING AND PROGRESS')
   const complete = demonstrate(after, CORE_AREAS)
   truthy('completed unfamiliar algorithm can get reference code', buildReferencePrompt(complete).includes('Build the whole map before a second scan'))
 }
+section('CIRCLING ONE AREA ESCALATES')
+{
+  // Live run: two justification questions, then a re-trace of the finished
+  // approach and a weak guess, each labelled "progress" by the model.
+  const asked = {
+    ...demonstrate(sessionWith({ focusArea: 'justification' }), ['approach']),
+    attention: { ...sessionWith().attention, justification: 2 },
+  }
+  const retrace = applyPolicy(asked, assessment({
+    progress: 'progress',
+    demonstrated: [{ area: 'approach', quote: 'When x = 7, seen is {2: 0}, so it returns [0, 1].', adequate: true, confidence: 0.9 }],
+  }), problem)
+  check('re-tracing a settled area does not reset the ladder', retrace.action, 'light_hint')
+
+  const partial = {
+    ...asked,
+    evidence: { ...asked.evidence, justification: { ...asked.evidence.justification, status: 'partial' as const, quotes: ['it is faster'] } },
+  }
+  const guess = applyPolicy(partial, assessment({
+    progress: 'progress',
+    demonstrated: [{ area: 'justification', quote: "it's one loop instead of two", adequate: false, confidence: 0.6 }],
+  }), problem)
+  check('a second weak guess on the same area escalates', guess.action, 'light_hint')
+
+  // Live rerun: the first weak guess reset the count to zero, so the stall
+  // after it got yet another question instead of a hint.
+  const first = applyPolicy(asked, assessment({
+    progress: 'progress',
+    demonstrated: [{ area: 'justification', quote: "it's one loop instead of two", adequate: false, confidence: 0.6 }],
+  }), problem)
+  check('a first weak guess gets one more question', first.action, 'ask_focused')
+  const held = applyDecision(asked, first, problem)
+  check('and the question count is held, not reset', held.attention.justification, 2)
+  const stall = applyPolicy(held, assessment({ progress: 'stuck' }), problem)
+  check('the stall after it reaches a hint', stall.action, 'light_hint')
+}
+
 section('ONE EDGE CASE AND HONEST SUMMARY')
 {
   const weak = 'its correct already because they guarantee one solution'

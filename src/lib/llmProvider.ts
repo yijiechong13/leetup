@@ -233,7 +233,7 @@ const ACTION_BRIEF: Record<string, string> = {
   ask_open:
     'Briefly acknowledge what they showed, then ask one concrete question about the next genuinely missing point in THEIR algorithm. The area question is a fallback, not a script. Do not ask a broad quiz or request a trace of reasoning already explained.',
   ask_focused:
-    'Ask the narrower question for this area. Still do not name the answer.',
+    'Ask the narrower question for this area. Still do not name the answer. This is a question, not a hint: do not supply worked state, intermediate values, or the mechanism (for example what the map holds at a step). Help belongs in hint turns, where it is recorded.',
   clarify:
     'You do not understand their approach well enough to judge it. Ask them to walk it through on the example, or to say what happens at one specific step. Do not guess at what they meant and do not steer them elsewhere.',
   repair:

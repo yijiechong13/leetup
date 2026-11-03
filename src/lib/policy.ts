@@ -646,14 +646,32 @@ export function applyPolicy(
   const needsClarification = assessment.needsClarification || assessment.intent === 'unclear'
   const asksForHelp = assessment.intent === 'request_help' || assessment.intent === 'request_answer'
   const repairFocus = issue?.area ?? state.focusArea ?? 'approach'
-  const makingProgress = assessment.progress === 'progress' || (assessment.progress === undefined && assessment.demonstrated.some(
-    (claim) => !state.evidence[claim.area].quotes.includes(claim.quote),
-  ))
+  // Progress means new evidence in an area not already settled: adequate
+  // evidence, or a first partial attempt. The model's own label is not enough:
+  // it calls a re-trace of a finished area, or a second weak guess, "progress",
+  // and trusting that reset the question ladder every turn, so a learner
+  // circling one area was never offered a hint.
+  const newClaims = assessment.progress === 'stuck' ? [] : assessment.demonstrated.filter((claim) => {
+    const record = state.evidence[claim.area]
+    return record.status !== 'demonstrated' &&
+      !record.quotes.includes(claim.quote) &&
+      (claim.adequate || record.status === 'unaddressed')
+  })
+  const makingProgress = newClaims.length > 0
+  // A first partial attempt earns one more question, but it does not erase the
+  // questions already asked: holding the count, rather than resetting it, is
+  // what lets the next stall reach a hint.
+  const partialOnly = makingProgress && !newClaims.some((claim) => claim.adequate)
   if (!issue && !asksForHelp && makingProgress) {
-    if (state.focusArea) resetAttention.push(state.focusArea)
+    if (state.focusArea && !partialOnly) resetAttention.push(state.focusArea)
+    const hold = partialOnly ? { bumpAttention: false } : {}
     if (needsClarification) return base('clarify', repairFocus, 'Useful answer: clarify only the remaining detail without giving a hint.', {
-      evidenceUpdates: updates, resetAttention,
+      evidenceUpdates: updates, resetAttention, ...hold,
     })
+    if (partialOnly && state.focusArea && selectFocus(provisional, relevant, state.deferredAreas) === state.focusArea)
+      return base('ask_focused', state.focusArea, 'First partial attempt: one more question, question count held.', {
+        evidenceUpdates: updates, resetAttention, ...hold,
+      })
     return finish(state, provisional, updates, relevant, assessment, resetAttention, base)
   }
 
