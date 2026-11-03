@@ -3,7 +3,7 @@ import type {
   ReasoningAreaId,
   SessionState,
 } from '../types'
-import { AREA_IDS, CORE_AREAS, getArea, matchApproach } from './reasoningAreas'
+import { AREA_IDS, CORE_AREAS, getArea } from './reasoningAreas'
 import { isCoreComplete, type EvidenceUpdate } from './session'
 
 /**
@@ -75,7 +75,10 @@ export interface Assessment {
     changedFrom: string | null
     /** The model could not place this approach: ask for a worked example. */
     unfamiliar: boolean
+    description?: string
   }
+  /** Is the learner contributing useful reasoning or actually stuck? */
+  progress?: 'progress' | 'stuck' | 'uncertain'
   demonstrated: DemonstratedClaim[]
   missing: { area: ReasoningAreaId; gap: string }[]
   contradictions: { area: ReasoningAreaId; detail: string; quote: string }[]
@@ -91,6 +94,7 @@ export interface PolicyDecision {
   /** Applied to the evidence record before the turn is worded. */
   evidenceUpdates: EvidenceUpdate[]
   /** The approach to record, when the learner named or changed one. */
+  approachDescription?: string
   approachName: string | null
   approachChangedFrom: string | null
   /** Advance the question ladder on the focus area. */
@@ -173,13 +177,36 @@ export function quoteSupports(
   quote: string,
   learnerText: string,
 ): boolean {
+  // Code punctuation is meaningful: do not validate an invented operator
+  // by stripping it. Quotes must be actual substrings, allowing line endings
+  // and typographic variants: a model quoting "That's" for a learner's
+  // "That’s" is quoting faithfully, and dropping it loses real evidence.
+  const literal = (text: string) =>
+    text
+      .replace(/\r\n/g, '\n')
+      .replace(/[‘’ʼ′]/g, "'")
+      .replace(/[“”″]/g, '"')
+      .replace(/[−–—]/g, '-')
+      .replace(/×/g, 'x')
+      .replace(/ /g, ' ')
+      .trim()
+  if (!literal(learnerText).includes(literal(quote))) return false
   const q = normalise(quote)
   if (q.length < 3) return false
   if (!normalise(learnerText).includes(q)) return false
 
+  if (area === 'correctness' && /\b(guaranteed?|promise|only one (answer|solution))\b/i.test(q) &&
+      !/\b(index|indices|different|distinct|pair|lookup|check|return)\b/i.test(q)) {
+    return false
+  }
+
   if (area === 'approach' || area === 'justification') {
     const words = q.split(' ').filter(Boolean).length
-    return words >= 8 || CAUSAL.test(q)
+    // This only admits code as evidence; the model still judges adequacy.
+    const codeStructure = /\b(for|while|if|return)\b|[\w\]]\s*(?:\[[^\]]+\]\s*)?=(?!=)|\w+\s*\([^)]*\)/.test(quote)
+    const conciseReason = area === 'justification' &&
+      /\b(lookup|look up|scan|search|access|store|storage|memory|pair|pairs|avoids?)\b/.test(q) && words >= 3
+    return words >= 8 || CAUSAL.test(q) || conciseReason || (area === 'approach' && codeStructure)
   }
   return true
 }
@@ -289,7 +316,9 @@ export function validateAssessment(
             ? approachRaw.changedFrom.trim()
             : null,
         unfamiliar: approachRaw.unfamiliar === true,
+        description: typeof approachRaw.description === 'string' ? approachRaw.description : undefined,
       },
+      progress: value.progress === 'stuck' || value.progress === 'uncertain' ? value.progress : 'progress',
       demonstrated,
       missing,
       contradictions,
@@ -395,20 +424,6 @@ export function isApproachDependent(area: ReasoningAreaId): boolean {
  * Resolved through the curated families first, so "dictionary", "hash map" and
  * "one pass with a map" are one approach, not three.
  */
-export function isApproachChange(
-  problem: CuratedProblem,
-  previous: string | null,
-  next: string | null,
-): boolean {
-  if (!next || !previous) return false
-
-  const a = matchApproach(problem, previous)
-  const b = matchApproach(problem, next)
-  if (a && b) return a.name !== b.name
-  // One or both unrecognised: fall back to comparing the words themselves.
-  return previous.trim().toLowerCase() !== next.trim().toLowerCase()
-}
-
 /* ------------------------------------------------------------------ *
  * The decision
  * ------------------------------------------------------------------ */
@@ -448,7 +463,7 @@ export function ladderStep(
 export function applyPolicy(
   state: SessionState,
   assessment: Assessment,
-  problem: CuratedProblem,
+  _problem: CuratedProblem,
 ): PolicyDecision {
   const suggested = assessment.suggestedAction
 
@@ -461,6 +476,7 @@ export function applyPolicy(
     action,
     focusArea,
     evidenceUpdates: [],
+    approachDescription: assessment.approach.description,
     approachName: assessment.approach.name,
     approachChangedFrom: assessment.approach.changedFrom,
     bumpAttention: true,
@@ -506,11 +522,7 @@ export function applyPolicy(
      Done before completion is considered or a focus is chosen, so a learner
      cannot finish on reasoning that described a different algorithm. */
   const resetAttention: ReasoningAreaId[] = []
-  const changedApproach = isApproachChange(
-    problem,
-    state.selectedApproach?.name ?? null,
-    assessment.approach.name,
-  )
+  const changedApproach = Boolean(state.selectedApproach && assessment.approach.changedFrom)
 
   if (changedApproach) {
     for (const area of AREA_IDS) {
@@ -538,27 +550,8 @@ export function applyPolicy(
       status: 'revisit',
       gap: first.detail,
     })
-    return base('repair', first.area, `Contradiction in ${first.area}.`, {
-      evidenceUpdates: updates,
-      resetAttention,
-    })
+    credited.delete(first.area)
   }
-
-  /* --- Unfamiliar or unreadable: ask, never judge. --------------------
-     Not the learner's failure, so the ladder does not advance. */
-  if (
-    assessment.approach.unfamiliar ||
-    assessment.needsClarification ||
-    assessment.intent === 'unclear'
-  )
-    return base(
-      'clarify',
-      state.focusArea,
-      assessment.approach.unfamiliar
-        ? 'Approach not recognised — ask for a worked example before judging it.'
-        : 'Assessment was uncertain.',
-      { evidenceUpdates: updates, bumpAttention: false, resetAttention },
-    )
 
   /* --- Apply the evidence, then look at what is left. ------------------ */
   const provisional: SessionState = {
@@ -625,6 +618,8 @@ export function applyPolicy(
   /* --- Already finished: the core activity is done. --------------------
      The remaining moves are the reference implementation and any optional
      comparison — not another pass over reasoning already demonstrated.
+     This must run before the progress branch below: a post-completion "yes"
+     reads as progress and would otherwise re-summarise.
 
      Unless something was just invalidated: a learner who finishes on a hash
      map and then switches to sorting is not finished any more, and must not be
@@ -632,13 +627,10 @@ export function applyPolicy(
   const invalidated = updates.some((u) => u.status === 'revisit')
 
   if (state.phase === 'complete' && !invalidated) {
-    const approach = matchApproach(problem, state.selectedApproach?.name ?? null)
     return base(
       'offer_reference',
       null,
-      approach?.referenceSolution
-        ? `Reference implementation available for ${approach.name}.`
-        : 'No reference implementation for the selected approach.',
+      'Generate an implementation of the learner approach after completion.',
       {
         evidenceUpdates: updates,
         resetAttention,
@@ -646,6 +638,37 @@ export function applyPolicy(
         bumpAttention: false,
       },
     )
+  }
+
+  // Misconceptions must climb the same support ladder as other gaps.
+  // Handle the post-explanation check above first, even if it is still wrong.
+  const issue = assessment.contradictions[0]
+  const needsClarification = assessment.needsClarification || assessment.intent === 'unclear'
+  const asksForHelp = assessment.intent === 'request_help' || assessment.intent === 'request_answer'
+  const repairFocus = issue?.area ?? state.focusArea ?? 'approach'
+  const makingProgress = assessment.progress === 'progress' || (assessment.progress === undefined && assessment.demonstrated.some(
+    (claim) => !state.evidence[claim.area].quotes.includes(claim.quote),
+  ))
+  if (!issue && !asksForHelp && makingProgress) {
+    if (state.focusArea) resetAttention.push(state.focusArea)
+    if (needsClarification) return base('clarify', repairFocus, 'Useful answer: clarify only the remaining detail without giving a hint.', {
+      evidenceUpdates: updates, resetAttention,
+    })
+    return finish(state, provisional, updates, relevant, assessment, resetAttention, base)
+  }
+
+  if (issue || (needsClarification && !asksForHelp)) {
+    const alreadyAsked = state.attention[repairFocus] >= 2 || state.assistance[repairFocus] > 0
+    if (alreadyAsked || asksForHelp) {
+      const { action, rung } = supportRung(state.assistance[repairFocus])
+      return base(action, repairFocus, 'Unresolved confusion: escalate support instead of repeating questions.', {
+        evidenceUpdates: updates, resetAttention, assistanceRung: rung,
+        awaitCheck: action === 'guided_explanation',
+      })
+    }
+    return base(issue ? 'repair' : 'clarify', repairFocus, 'Ask one concrete clarification before escalating support.', {
+      evidenceUpdates: updates, resetAttention,
+    })
   }
 
   /* --- Asking for help, or for the answer. -----------------------------
@@ -748,7 +771,9 @@ function finish(
       resetAttention,
     })
 
-  const { action, rung } = ladderStep(state.attention[next], state.assistance[next])
+  const { action, rung } = resetAttention.includes(next)
+    ? { action: 'ask_focused' as TutorAction, rung: null }
+    : ladderStep(state.attention[next], state.assistance[next])
   return base(action, next, `Still unresolved on ${getArea(next).label}.`, {
     evidenceUpdates: updates,
     assistanceRung: rung,

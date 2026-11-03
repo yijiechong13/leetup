@@ -1,5 +1,5 @@
 import type { CuratedProblem, ReasoningAreaId, SessionState } from '../types'
-import { CORE_AREAS, getArea, matchApproach } from './reasoningAreas'
+import { CORE_AREAS, getArea } from './reasoningAreas'
 import { isFullyIndependent } from './session'
 
 /**
@@ -25,20 +25,19 @@ function areaLine(
   if (record.status === 'unaddressed') return null
 
   const label = getArea(area).label
-  const quote = record.quotes[record.quotes.length - 1]
-
   if (record.status === 'demonstrated') {
     const how = SUPPORT_PHRASE[record.support ?? 'independent']
-    return `• **${label}** — ${how}${quote ? `: "${truncate(quote)}"` : '.'}`
+    const credited = record.creditedQuotes ?? []
+    const proof = credited.length > 0 ? credited : record.quotes.slice(-1)
+    const excerpts = proof.slice(-2).map((quote) => `"${truncate(quote, 90)}"`).join(' and ')
+    return `• **${label}** — ${how}${excerpts ? `: ${excerpts}` : '.'}`
   }
   if (record.status === 'revisit')
     return `• **${label}** — still open${record.gap ? `: ${record.gap}` : '.'}`
   return `• **${label}** — partly covered${record.gap ? `: ${record.gap}` : '.'}`
 }
 
-/* Display order — every area that has anything on the record, core or not.
-   Justification is not required to finish, but when a learner did explain it
-   the summary says so. */
+/* Display order for all recorded evidence, including situational areas. */
 const SUMMARY_ORDER: ReasoningAreaId[] = [
   'approach',
   'justification',
@@ -53,10 +52,9 @@ const truncate = (text: string, max = 110) =>
 
 export function buildSummaryText(
   state: SessionState,
-  problem: CuratedProblem,
+  _problem: CuratedProblem,
 ): string {
   const chosenName = state.selectedApproach?.name ?? null
-  const approach = matchApproach(problem, chosenName)
 
   const lines: string[] = []
 
@@ -70,13 +68,6 @@ export function buildSummaryText(
   for (const area of SUMMARY_ORDER) {
     const line = areaLine(state, area)
     if (line) lines.push(line)
-  }
-
-  if (approach) {
-    lines.push('')
-    lines.push(
-      `For the record, ${approach.name} costs ${approach.timeComplexity} time and ${approach.spaceComplexity} extra space. ${approach.tradeoff}`,
-    )
   }
 
   /* Honesty about how the activity was completed. This is one session's
@@ -113,7 +104,7 @@ export function buildSummaryText(
  */
 export function buildReviewOfferText(
   state: SessionState,
-  problem: CuratedProblem,
+  _problem: CuratedProblem,
 ): string {
   const open = CORE_AREAS.filter(
     (id) => state.evidence[id].status !== 'demonstrated',
@@ -136,42 +127,5 @@ export function buildReviewOfferText(
     '• **Keep going** — if any of it has clicked since, explain it and I will pick the thread back up.',
   ]
 
-  if (approach) {
-    const matched = matchApproach(problem, approach)
-    if (matched)
-      lines.push(
-        '',
-        `For what it is worth, you did land on ${matched.name}, and that is a correct approach to this problem.`,
-      )
-  }
-
   return lines.join('\n')
-}
-
-/**
- * Reference implementation for the approach the learner actually chose.
- *
- * Returns null when there is no implementation for that approach — the caller
- * says so plainly rather than substituting a different approach's code.
- */
-export function referenceFor(
-  state: SessionState,
-  problem: CuratedProblem,
-): { name: string; code: string } | null {
-  const approach = matchApproach(problem, state.selectedApproach?.name ?? null)
-  if (!approach?.referenceSolution) return null
-  return { name: approach.name, code: approach.referenceSolution }
-}
-
-export function referenceUnavailableMessage(
-  state: SessionState,
-  problem: CuratedProblem,
-): string {
-  const chosen = state.selectedApproach?.name ?? 'the approach you described'
-  const approach = matchApproach(problem, state.selectedApproach?.name ?? null)
-
-  if (approach && approach.correctness === 'incorrect')
-    return `I do not have a reference implementation for ${chosen}, because there isn't a correct one — ${approach.correctnessNotes} I could show you an implementation of a different approach, but only if you want to switch to it deliberately rather than have me swap it in.`
-
-  return `I do not have a reference implementation for ${chosen} in this problem's material. I would rather say that than hand you code for a different approach and let it look like yours. If you would like to see one of the curated approaches instead, say which.`
 }

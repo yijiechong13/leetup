@@ -7,6 +7,19 @@ const difficultyClass: Record<CuratedProblem['difficulty'], string> = {
   Hard: 'bg-red-50 text-red-600',
 }
 
+function highlightVariables(text: string, explanation = false) {
+  const tokens = explanation
+    ? /(\bnums\[[^\]]+\]|-?\d+\s*\+\s*-?\d+\s*=\s*-?\d+|\[\s*-?\d+(?:\s*,\s*-?\d+)*\s*\])/g
+    : /(\bnums\b(?:\[[^\]]+\]|\.length\b)?|\btarget\b)/g
+  return text.split(tokens).map((part, index) =>
+    index % 2 === 1 ? (
+      <code key={index} className="rounded border border-line bg-canvas px-1 py-0.5 font-mono text-[0.95em] font-medium text-ink">
+        {part}
+      </code>
+    ) : part,
+  )
+}
+
 export function ProblemPanel({ problem }: { problem: CuratedProblem }) {
   return (
     <section
@@ -33,17 +46,18 @@ export function ProblemPanel({ problem }: { problem: CuratedProblem }) {
           </span>
         </div>
 
-        <p className="mt-3 text-[14px] leading-6 text-ink-soft">{problem.statement}</p>
+        <p className="mt-3 text-[14px] leading-6 text-ink-soft">{highlightVariables(problem.statement)}</p>
 
         {problem.examples.map((example, index) => (
           <div key={index}>
-            <h4 className="mt-5 text-[13px] font-semibold text-ink">Example {index + 1}</h4>
-            <div className="mt-2 rounded-md bg-canvas px-3 py-2.5 font-mono text-[12.5px] leading-6 text-ink-soft">
-              <div><span className="text-ink-faint">Input: </span>{example.input}</div>
-              <div><span className="text-ink-faint">Output: </span>{example.output}</div>
+            <h4 className="mt-5 text-[13px] font-semibold text-ink">Example {index + 1}:</h4>
+            <div className="mt-3 text-[14px] leading-7 text-ink">
+              <div><span className="font-sans font-semibold text-ink">Input: </span><code className="rounded border border-line bg-canvas px-1 py-0.5 font-mono font-medium text-ink">{example.input}</code></div>
+              <div className="mt-3"><span className="font-sans font-semibold text-ink">Output: </span><code className="rounded border border-line bg-canvas px-1 py-0.5 font-mono font-medium text-ink">{example.output}</code></div>
               {example.explanation && (
-                <div className="mt-1 font-sans text-[12.5px] text-ink-faint">
-                  {example.explanation}
+                <div className="mt-3">
+                  <p className="font-semibold">Explanation:</p>
+                  <p className="mt-3">{highlightVariables(example.explanation, true)}</p>
                 </div>
               )}
             </div>
@@ -58,7 +72,7 @@ export function ProblemPanel({ problem }: { problem: CuratedProblem }) {
               className="flex gap-2 font-mono text-[12.5px] leading-5 text-ink-soft"
             >
               <span className="text-ink-faint">•</span>
-              <span>{c}</span>
+              <span>{highlightVariables(c)}</span>
             </li>
           ))}
         </ul>

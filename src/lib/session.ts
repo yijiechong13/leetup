@@ -37,6 +37,7 @@ const blankEvidence = (): AreaEvidence => ({
   status: 'unaddressed',
   support: null,
   quotes: [],
+  creditedQuotes: [],
   gap: null,
   updatedAtTurn: 0,
 })
@@ -156,6 +157,14 @@ export function applyEvidence(
         update.quote && !current.quotes.includes(update.quote)
           ? [...current.quotes, update.quote]
           : current.quotes,
+      creditedQuotes:
+        update.status === 'demonstrated' && update.quote
+          ? [...(current.status === 'demonstrated' ? current.creditedQuotes ?? [] : []), update.quote]
+          : update.status === 'demonstrated'
+            ? current.creditedQuotes ?? []
+            : update.status === 'revisit' || update.status === 'unaddressed'
+              ? []
+              : current.creditedQuotes ?? [],
       gap: update.gap === undefined ? current.gap : update.gap,
       updatedAtTurn: state.turn,
     }

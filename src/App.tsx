@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { Download, RotateCcw } from 'lucide-react'
 import { ProblemPanel } from './components/ProblemPanel'
 import { ChatPanel } from './components/ChatPanel'
 import { ReasoningChecklist } from './components/ReasoningChecklist'
@@ -15,7 +15,8 @@ import {
   startSession,
 } from './lib/session'
 import { activeProvider } from './lib/responseProvider'
-import type { SessionState } from './types'
+import { exportSession, logTurn, type TurnLog } from './lib/exportLog'
+import type { ChatMessage, SessionState } from './types'
 
 /** Small pause so the turn-taking reads as a conversation, not a form submit. */
 const THINKING_MS = 420
@@ -25,6 +26,9 @@ export default function App() {
     startSession(createSession()).updatedState,
   )
   const [thinking, setThinking] = useState(false)
+  const [pending, setPending] = useState<ChatMessage | null>(null)
+  // Per-turn test log; kept beside the session, not in it.
+  const [turns, setTurns] = useState<TurnLog[]>([])
   const { theme, setTheme } = useTheme()
 
   // Panels are only resizable in the side-by-side (lg) layout; below that they
@@ -59,18 +63,33 @@ export default function App() {
   const progress = useMemo(() => coreProgress(state), [state])
 
   const handleSend = async (text: string) => {
+    // Echo the learner's message right away; the provider only adds it to
+    // state once the model has replied.
+    setPending({
+      id: `pending-${Date.now()}`,
+      role: 'learner',
+      text,
+      area: state.focusArea ?? 'system',
+    })
     setThinking(true)
     const result = await activeProvider.getNextResponse(state, text)
+    const entry = logTurn(result.updatedState, text, result.assistantMessages, result.trace)
     window.setTimeout(() => {
       setState(result.updatedState)
+      setTurns((log) => [...log, entry])
+      setPending(null)
       setThinking(false)
     }, THINKING_MS)
   }
 
   const handleReset = () => {
     setState(startSession(createSession(state.problemId)).updatedState)
+    setPending(null)
     setThinking(false)
+    setTurns([])
   }
+
+  const messages = pending ? [...state.messages, pending] : state.messages
 
   return (
     <div className="flex h-full min-h-screen flex-col">
@@ -84,6 +103,18 @@ export default function App() {
 
           <div className="ml-auto flex items-center gap-3">
             <ThemeToggle theme={theme} onChange={setTheme} />
+            {(['md', 'json'] as const).map((format) => (
+              <button
+                key={format}
+                onClick={() => void exportSession(state, turns, format)}
+                disabled={turns.length === 0}
+                title={`Download this session as ${format === 'md' ? 'Markdown' : 'JSON'}`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-[12.5px] text-ink-soft transition-colors hover:border-ink-faint hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Download className="size-3.5" />
+                Export {format === 'md' ? 'MD' : 'JSON'}
+              </button>
+            ))}
             <button
               onClick={handleReset}
               className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-[12.5px] text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
@@ -120,7 +151,7 @@ export default function App() {
 
         <div className="min-h-[60vh] lg:h-full lg:min-w-0 lg:flex-1 lg:min-h-0">
           <ChatPanel
-            messages={state.messages}
+            messages={messages}
             onSend={handleSend}
             thinking={thinking}
           />

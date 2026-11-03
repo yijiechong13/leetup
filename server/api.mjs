@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 import { existsSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 const envFile = resolve(process.cwd(), '.env')
@@ -12,6 +13,16 @@ const configured = () => Boolean(
   process.env.ANTHROPIC_API_KEY !== 'replace_with_anthropic_key',
 )
 const model = () => process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5'
+/** Commit the logs were produced on; "-dirty" marks uncommitted changes. */
+const codeVersion = () => {
+  try {
+    const commit = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    const dirty = execSync('git status --porcelain', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    return dirty ? `${commit}-dirty` : commit
+  } catch {
+    return 'unknown'
+  }
+}
 const json = (response, status, body) => {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
   response.end(JSON.stringify(body))
@@ -28,7 +39,7 @@ async function readBody(request) {
 
 async function handle(request, response) {
   if (request.method === 'GET' && request.url === '/api/status') {
-    return json(response, 200, { configured: configured() })
+    return json(response, 200, { configured: configured(), model: model(), version: codeVersion() })
   }
   if (request.method !== 'POST' || request.url !== '/api/chat') {
     return json(response, 404, { error: 'Not found' })

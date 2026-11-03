@@ -35,6 +35,7 @@ function renderInline(text: string, keyPrefix: string) {
 }
 
 function MessageBody({ message }: { message: ChatMessage }) {
+  const learner = message.role === 'learner'
   const blocks = message.text.split(/```(?:\w+)?\n?/)
   return (
     <>
@@ -49,7 +50,7 @@ function MessageBody({ message }: { message: ChatMessage }) {
         ) : (
           block && (
             <p key={i} className="whitespace-pre-wrap">
-              {renderInline(block, `${message.id}-${i}`)}
+              {learner ? block : renderInline(block, `${message.id}-${i}`)}
             </p>
           )
         ),
@@ -77,6 +78,7 @@ export function ChatPanel({
   thinking: boolean
 }) {
   const [draft, setDraft] = useState('')
+  const [codeMode, setCodeMode] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -94,9 +96,19 @@ export function ChatPanel({
     if (!thinking) inputRef.current?.focus()
   }, [thinking])
 
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+    input.style.height = 'auto'
+    input.style.height = `${Math.min(input.scrollHeight, 240)}px`
+  }, [draft, codeMode])
+
   const submit = (text: string) => {
-    const value = text.trim()
-    if (!value || thinking) return
+    if (!text.trim() || thinking) return
+    // Preserve leading indentation, including an indented first line.
+    const value = codeMode && !text.trimStart().startsWith('```')
+      ? '```\n' + text + '\n```'
+      : text
     onSend(value)
     setDraft('')
   }
@@ -111,8 +123,8 @@ export function ChatPanel({
           {messages.map((m) =>
             m.role === 'learner' ? (
               <div key={m.id} className="flex justify-end">
-                <div className="max-w-[82%] rounded-lg rounded-br-sm bg-ink px-3.5 py-2.5 text-[13.5px] leading-6 text-on-ink">
-                  <p className="whitespace-pre-wrap">{m.text}</p>
+                <div className="min-w-0 max-w-[82%] space-y-2 break-words rounded-lg rounded-br-sm bg-ink px-3.5 py-2.5 text-[13.5px] leading-6 text-on-ink">
+                  <MessageBody message={m} />
                 </div>
               </div>
             ) : (
@@ -121,7 +133,7 @@ export function ChatPanel({
                   LU
                 </div>
                 <div
-                  className={`max-w-[88%] space-y-2 rounded-lg rounded-tl-sm border px-3.5 py-2.5 text-[13.5px] leading-6 text-ink-soft ${
+                  className={`min-w-0 max-w-[88%] space-y-2 break-words rounded-lg rounded-tl-sm border px-3.5 py-2.5 text-[13.5px] leading-6 text-ink-soft ${
                     kindStyle[m.kind ?? 'question'] ?? 'border-line bg-surface'
                   }`}
                 >
@@ -151,21 +163,39 @@ export function ChatPanel({
       </div>
 
       <div className="border-t border-line px-4 py-3">
+        <div className="mb-2 flex items-center justify-between gap-2 text-xs text-ink-faint">
+          <button
+            type="button"
+            aria-pressed={codeMode}
+            disabled={thinking}
+            onClick={() => { setCodeMode(!codeMode); inputRef.current?.focus() }}
+            className="rounded border border-line px-2 py-1 text-ink-soft hover:border-ink-faint"
+          >
+            Code mode
+          </button>
+          <span id="composer-help">
+            {codeMode ? 'Enter for new line · ⌘/Ctrl+Enter to send' : 'Shift+Enter for new line'}
+          </span>
+        </div>
         <div className="flex items-end gap-2 rounded-lg border border-line bg-surface px-2.5 py-2 focus-within:border-ink-faint">
           <textarea
             ref={inputRef}
-            rows={1}
+            rows={codeMode ? 5 : 1}
+            aria-label="Your reasoning or code"
+            aria-describedby="composer-help"
+            spellCheck={!codeMode}
             value={draft}
             disabled={thinking}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.nativeEvent.isComposing) return
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || (!codeMode && !e.shiftKey))) {
                 e.preventDefault()
                 submit(draft)
               }
             }}
-            placeholder="Type your reasoning…"
-            className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-6 text-ink outline-none placeholder:text-ink-faint disabled:cursor-not-allowed"
+            placeholder={codeMode ? "Write or paste your attempt…" : "Share your reasoning or code…"}
+            className={`max-h-60 min-h-[24px] min-w-0 flex-1 resize-none bg-transparent py-1 text-[13.5px] leading-6 text-ink outline-none placeholder:text-ink-faint disabled:cursor-not-allowed ${codeMode ? 'font-mono whitespace-pre overflow-x-auto' : ''}`}
           />
           <button
             onClick={() => submit(draft)}

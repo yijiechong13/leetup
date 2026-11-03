@@ -46,6 +46,8 @@ export interface AreaEvidence {
   support: SupportLevel | null
   /** Verbatim learner text that supports this area, oldest first. */
   quotes: string[]
+  /** Learner quotes used when this area was credited; excludes later partial replies. */
+  creditedQuotes?: string[]
   /** What is still missing or what contradicted it. */
   gap: string | null
   /** Turn number of the last change, for the transcript and for debugging. */
@@ -53,27 +55,19 @@ export interface AreaEvidence {
 }
 
 export interface SelectedApproach {
-  /** A curated approach name when recognised, otherwise the learner's own words. */
+  /** A short label for the learner's algorithm. */
   name: string
-  /** True when it matches a curated approach family in the problem metadata. */
-  recognised: boolean
+  /** Legacy field retained for older session fixtures; not used for decisions. */
+  recognised?: boolean
+  /** Learner-specific steps and unresolved details, not a reference family. */
+  description?: string
   /** The approach this replaced, when the learner changed their mind. */
   changedFrom: string | null
   /** Turn the approach was selected or changed. */
   selectedAtTurn: number
 }
 
-/**
- * One approach family a learner might bring to a problem.
- *
- * A problem is not a single right answer. Brute force is correct but slow; the
- * hash map trades space for time; sorting is correct as long as the original
- * index mapping is preserved or recovered. Curating them all is what lets the
- * tutor discuss trade-offs instead of steering every learner to one answer.
- *
- * The prose fields exist so that hints, guided explanations, summaries and any
- * reference implementation can be generated *for the learner's own approach*.
- */
+/** Known solution used only by offline evaluation fixtures. */
 export interface Approach {
   name: string
   role: 'baseline' | 'target-optimized' | 'alternative' | 'conditionally-correct'
@@ -111,12 +105,6 @@ export interface CuratedProblem {
   constraints: string[]
   followUp?: string
   metadata: {
-    /**
-     * Reference examples of approach families — NOT an exhaustive whitelist.
-     * A learner may bring something not listed; the tutor asks them to explain
-     * it rather than judging it against this list.
-     */
-    validApproaches: Approach[]
     /** Requirements that actually constrain a solution, for the requirements area. */
     keyRequirements: string[]
     commonMisconceptions: string[]
@@ -163,8 +151,8 @@ export interface SessionState {
   /** The evidence record — the heart of the model. */
   evidence: Record<ReasoningAreaId, AreaEvidence>
   /**
-   * Tutor turns spent on each area. Drives the question ladder: 0 open
-   * question, 1 focused question, 2+ into the support ladder below.
+   * Question attempts since useful progress in each area. Progress resets
+   * the counter; assistance history is preserved separately.
    */
   attention: Record<ReasoningAreaId, number>
   /**
@@ -189,7 +177,27 @@ export interface SessionState {
   messages: ChatMessage[]
 }
 
+/** What the tutor saw and decided on one turn, for exported test logs. */
+export interface TurnTrace {
+  intent: string | null
+  progress: string | null
+  suggestedAction: string | null
+  action: string
+  focusArea: ReasoningAreaId | null
+  reason: string
+  overrodeSuggestion: boolean
+  /** Claims that survived validation, whether or not they were adequate. */
+  claims: { area: ReasoningAreaId; quote: string; adequate: boolean }[]
+  missing: { area: ReasoningAreaId; gap: string }[]
+  contradictions: { area: ReasoningAreaId; detail: string }[]
+  /** Claims the validator rejected: invented or too-thin quotes. */
+  dropped: string[]
+  /** Set when the model call failed and nothing was recorded. */
+  recoveryReason?: string
+}
+
 export interface EngineResult {
   assistantMessages: ChatMessage[]
   updatedState: SessionState
+  trace?: TurnTrace
 }

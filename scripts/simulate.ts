@@ -5,7 +5,8 @@ import { createSession, isCoreComplete, startSession } from '../src/lib/session'
 import { applyPolicy, quoteSupports, validateAssessment, type Assessment, type TutorAction } from '../src/lib/policy'
 import { applyDecision } from '../src/lib/applyDecision'
 import { CORE_AREAS } from '../src/lib/reasoningAreas'
-import { referenceFor } from '../src/lib/summary'
+import { buildAssessmentPrompt, buildGenerationPrompt, buildReferencePrompt } from '../src/lib/llmProvider'
+import { buildSummaryText } from '../src/lib/summary'
 
 
 const problem = getProblem('two-sum')
@@ -307,8 +308,9 @@ function policyChecks() {
       }),
       problem,
     )
-    check('asks for a worked example', decision.action, 'clarify')
-    check('and does not cost the learner a rung', decision.bumpAttention, false)
+    check('an unfamiliar label alone does not require clarification', decision.action, 'ask_focused')
+    check('clarification is counted to prevent an endless loop', decision.bumpAttention, true)
+    check('clarification does not yet give a hint', decision.assistanceRung, null)
   }
 
   console.log('\nOptional comparison is allowed but never forced:')
@@ -362,6 +364,11 @@ function evidenceChecks() {
     'an invented quote is rejected',
     quoteSupports('complexity', 'I would sort the array first', learner),
     false,
+  )
+  truthy(
+    'a straight-apostrophe quote of curly learner text is accepted',
+    quoteSupports('complexity', "That's O(n) extra space, growing linearly with nums",
+      'It holds n entries. That’s O(n) extra space, growing linearly with nums.'),
   )
 
   console.log('\nNaming a data structure is not a justification:')
@@ -540,7 +547,7 @@ function regressionChecks() {
         problem,
       )
       const after = applyDecision(before, decision, problem)
-      check('an alias resolves to the same approach', after.selectedApproach?.name, 'Hash map lookup')
+      check('learner wording is retained without canonical mapping', after.selectedApproach?.name, 'a dictionary from value to index')
       check('nothing is invalidated', after.evidence.justification.status, 'demonstrated')
       check('and the session stays complete', after.phase, 'complete')
     }
@@ -669,8 +676,143 @@ function completionRuleChecks() {
     },
   }
   check('correct brute force is complete', isCoreComplete(bruteForce), true)
-  check('brute force receives its own reference',
-    referenceFor(bruteForce, problem)?.name, 'Nested loops')
+  truthy('completed approach can request generated code', buildReferencePrompt(bruteForce).includes('Nested loops'))
+  // A typed "yes" after the summary reads as progress; it must not re-summarise.
+  check('a "yes" after completion gets the reference code',
+    applyPolicy({ ...bruteForce, phase: 'complete' }, assessment({ progress: 'progress' }), problem).action,
+    'offer_reference')
+}
+
+
+function codeEvidenceChecks() {
+  section('CODE EVIDENCE')
+  const code = 'seen[value] = index'
+  check('short code admitted as approach evidence', quoteSupports('approach', code, code), true)
+  check('assignment alone is not justification', quoteSupports('justification', code, code), false)
+  check('invented operator rejected', quoteSupports('approach', 'seen[value] == index', code), false)
+  check('invented index rejected', quoteSupports('approach', 'seen[index] = value', code), false)
+  const validated = validateAssessment(assessment({
+    demonstrated: [{ area: 'approach', quote: code, adequate: false, confidence: 0.9 }],
+  }), code)
+  if (!validated.ok) throw new Error(validated.reason)
+  const partial = applyDecision(sessionWith(), applyPolicy(sessionWith(), validated.assessment, problem), problem)
+  check('unfinished attempt stays partial', partial.evidence.approach.status, 'partial')
+  check('unfinished attempt cannot complete session', isCoreComplete(partial), false)
+
+  const fullCode = 'for i in range(len(nums)):\n    for j in range(i + 1, len(nums)):\n        if nums[i] + nums[j] == target:\n            return [i, j]'
+  const report = validateAssessment(assessment({
+    approach: { name: 'Nested loops', changedFrom: null, unfamiliar: false },
+    demonstrated: [{ area: 'approach', quote: fullCode, adequate: true, confidence: 0.9 }],
+  }), fullCode)
+  if (!report.ok) throw new Error(report.reason)
+  const decision = applyPolicy(sessionWith(), report.assessment, problem)
+  const state = applyDecision(sessionWith(), decision, problem)
+  check('concrete code records the approach', state.evidence.approach.status, 'demonstrated')
+  check('code alone leaves justification unresolved', state.evidence.justification.status, 'unaddressed')
+  check('code alone leaves correctness reasoning unresolved', state.evidence.correctness.status, 'unaddressed')
+  check('code alone leaves complexity unresolved', state.evidence.complexity.status, 'unaddressed')
+  check('follow-up asks for missing justification', decision.focusArea, 'justification')
+  check('code evidence preserves indentation', state.evidence.approach.quotes[0], fullCode)
+}
+
+codeEvidenceChecks()
+
+function boundedConfusionChecks() {
+  section('BOUNDED CONFUSION')
+  for (const kind of ['contradiction', 'clarification'] as const) {
+    let state = sessionWith()
+    const report = assessment(kind === 'contradiction' ? {
+      contradictions: [{ area: 'approach', detail: 'A single-index map does not append.', quote: 'it appends' }],
+    } : { needsClarification: true, intent: 'unclear' })
+    const actions: TutorAction[] = []
+    for (let turn = 0; turn < 5; turn++) {
+      const decision = applyPolicy(state, report, problem)
+      actions.push(decision.action)
+      state = applyDecision(state, decision, problem)
+    }
+    check(`${kind}: questions escalate to explanation then move on`, actions, [
+      kind === 'contradiction' ? 'repair' : 'clarify',
+      'light_hint', 'stronger_hint', 'guided_explanation', 'ask_open',
+    ])
+    check(`${kind}: failed check remains unresolved`, state.evidence.approach.status, 'partial')
+    check(`${kind}: support is recorded`, state.evidence.approach.support, 'after-guidance')
+    check(`${kind}: failed check is deferred`, state.deferredAreas.includes('approach'), true)
+  }
+  const help = applyPolicy(sessionWith(), assessment({ intent: 'request_help', needsClarification: true }), problem)
+  check('asking for help bypasses clarification', help.action, 'light_hint')
+}
+
+boundedConfusionChecks()
+section('LEARNER APPROACH AND CONCISE EVIDENCE')
+check('short lookup explanation is admitted', quoteSupports('justification', 'single look up approach O(1)', 'single look up approach O(1)'), true)
+check('bare map name still insufficient', quoteSupports('justification', 'use a hash map', 'use a hash map'), false)
+section('RUBRIC TUTORING AND PROGRESS')
+{
+  const before = sessionWith()
+  before.attention.approach = 8
+  const quote = 'index as value, numbers as the key, look up the complement'
+  const parsed = validateAssessment({
+    ...assessment({
+      needsClarification: true,
+      approach: { name: 'My prefilled map', description: 'Build the whole map before a second scan. Check found index differs from current index.', changedFrom: null, unfamiliar: true },
+      demonstrated: [{ area: 'approach', quote, adequate: false, confidence: 0.9 }],
+    }),
+    progress: 'progress',
+  }, quote)
+  if (!parsed.ok) throw new Error(parsed.reason)
+  const decision = applyPolicy(before, parsed.assessment, problem)
+  const after = applyDecision(before, decision, problem)
+  check('useful partial answer receives ordinary clarification', decision.action, 'clarify')
+  check('useful partial answer receives no support rung', decision.assistanceRung, null)
+  check('answer stays independently demonstrated so far', after.evidence.approach.support, 'independent')
+  check('progress resets question counter', after.attention.approach, 1)
+  check('learner description is retained', after.selectedApproach?.description, parsed.assessment.approach.description)
+  truthy('generation gets actual learner steps', buildGenerationPrompt(after, decision, parsed.assessment).includes('Build the whole map before a second scan'))
+  check('assessment contains no curated solution list', buildAssessmentPrompt(after).includes('Reference approach families'), false)
+  const active = { ...after, assistance: { ...after.assistance, approach: 2 } }
+  const continued = applyPolicy(active, { ...parsed.assessment, needsClarification: false }, problem)
+  check('progress after a hint returns to ordinary follow-up', continued.action, 'ask_focused')
+  check('ordinary follow-up does not escalate assistance', continued.assistanceRung, null)
+  const next = applyDecision(active, continued, problem)
+  check('previous support remains honestly recorded', next.evidence.approach.support, 'after-hints')
+  let gated = false
+  try { buildReferencePrompt(after) } catch { gated = true }
+  check('reference generation blocked before completion', gated, true)
+  const complete = demonstrate(after, CORE_AREAS)
+  truthy('completed unfamiliar algorithm can get reference code', buildReferencePrompt(complete).includes('Build the whole map before a second scan'))
+}
+section('ONE EDGE CASE AND HONEST SUMMARY')
+{
+  const weak = 'its correct already because they guarantee one solution'
+  check('promise alone is not proof of correctness', quoteSupports('correctness', weak, weak), false)
+  const invalid = validateAssessment(assessment({
+    demonstrated: [{ area: 'correctness', quote: weak, adequate: true, confidence: 1 }],
+  }), weak)
+  if (!invalid.ok) throw new Error(invalid.reason)
+  check('unsupported correctness credit is dropped', invalid.assessment.demonstrated.length, 0)
+
+  const before = demonstrate(sessionWith({ focusArea: 'correctness' }), ['approach', 'justification'])
+  const edgeCase = 'For [3,3], the map holds 3 at index 1; at index 0 the lookup finds 1, so the indices differ and I return [0,1].'
+  const credited = validateAssessment(assessment({
+    demonstrated: [{ area: 'correctness', quote: edgeCase, adequate: true, confidence: 0.95 }],
+  }), edgeCase)
+  if (!credited.ok) throw new Error(credited.reason)
+  const decision = applyPolicy(before, credited.assessment, problem)
+  const after = applyDecision(before, decision, problem)
+  check('one reasoned edge case moves to complexity', decision.focusArea, 'complexity')
+  check('correctness credited', after.evidence.correctness.status, 'demonstrated')
+  check('credited quote saved separately', after.evidence.correctness.creditedQuotes, [edgeCase])
+  const later = applyDecision(after, {
+    ...decision,
+    action: 'ask_open',
+    focusArea: 'complexity',
+    evidenceUpdates: [{ area: 'complexity', status: 'partial', quote: 'the map holds n values' }],
+    approachName: null,
+  }, problem)
+  const complete = demonstrate(later, ['complexity'])
+  const summary = buildSummaryText(complete, problem)
+  truthy('summary cites the reasoned edge case', summary.includes(edgeCase.slice(0, 70)))
+  check('summary omits invented algorithm narrative', summary.includes('Your approach:'), false)
 }
 
 policyChecks()

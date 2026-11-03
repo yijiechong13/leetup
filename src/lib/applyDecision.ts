@@ -1,7 +1,6 @@
 import type { CuratedProblem, SessionState } from '../types'
-import { matchApproach } from './reasoningAreas'
 import { applyEvidence, isCoreComplete } from './session'
-import { isApproachChange, type PolicyDecision } from './policy'
+import { type PolicyDecision } from './policy'
 
 /**
  * The backend's half of a turn: what a policy decision does to the session.
@@ -14,27 +13,22 @@ import { isApproachChange, type PolicyDecision } from './policy'
 export function applyDecision(
   state: SessionState,
   decision: PolicyDecision,
-  problem: CuratedProblem,
+  _problem: CuratedProblem,
 ): SessionState {
   let next = applyEvidence(state, decision.evidenceUpdates)
 
   /* Record or update the learner's chosen approach. An alias or a rephrasing
-     of the same approach is not a change — `isApproachChange` resolves both
-     through the curated families before deciding. */
+     of the same approach is not a change. The assessment explicitly records
+     a learner change separately from clarification of their existing steps. */
   if (decision.approachName) {
-    const matched = matchApproach(problem, decision.approachName)
     const previous = next.selectedApproach
-    const changed = isApproachChange(
-      problem,
-      previous?.name ?? null,
-      decision.approachName,
-    )
+    const changed = Boolean(previous && decision.approachChangedFrom)
 
     next = {
       ...next,
       selectedApproach: {
-        name: matched?.name ?? decision.approachName,
-        recognised: matched !== null,
+        name: decision.approachName,
+        description: decision.approachDescription ?? (changed ? undefined : previous?.description),
         // The transcript keeps the whole history; this is the immediate
         // predecessor, for the summary to mention.
         changedFrom: changed
