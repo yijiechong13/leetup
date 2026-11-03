@@ -1,5 +1,5 @@
 import type { CuratedProblem, SessionState } from '../types'
-import { applyEvidence, isCoreComplete } from './session'
+import { applyEvidence, isCoreComplete, supportLevelFor } from './session'
 import { type PolicyDecision } from './policy'
 
 /**
@@ -15,7 +15,21 @@ export function applyDecision(
   decision: PolicyDecision,
   _problem: CuratedProblem,
 ): SessionState {
-  let next = applyEvidence(state, decision.evidenceUpdates)
+  /* Help on the previous turn shapes everything the learner says next, not
+     only the area it was aimed at. A hint on correctness that spells out the
+     no-reuse rule must not let that same sentence count as independent
+     evidence for requirements. */
+  const lastTutor = [...state.messages].reverse().find((m) => m.role === 'assistant')
+  const helped = state.focusArea && (lastTutor?.kind === 'hint' || lastTutor?.kind === 'reveal')
+    ? state.assistance[state.focusArea]
+    : 0
+  const updates = helped > 0
+    ? decision.evidenceUpdates.map((u) => u.support || u.status === 'unaddressed'
+      ? u
+      : { ...u, support: supportLevelFor(Math.max(helped, state.assistance[u.area])) })
+    : decision.evidenceUpdates
+
+  let next = applyEvidence(state, updates)
 
   /* Record or update the learner's chosen approach. An alias or a rephrasing
      of the same approach is not a change. The assessment explicitly records
@@ -36,6 +50,20 @@ export function applyDecision(
           : (previous?.changedFrom ?? null),
         selectedAtTurn: changed ? next.turn : (previous?.selectedAtTurn ?? next.turn),
       },
+    }
+
+    /* The approach is usually re-credited in the very turn it changes, so it is
+       never marked for revisit; without this its evidence would still cite the
+       old algorithm as support for the new one. */
+    if (changed) {
+      const fresh = updates
+        .filter((u) => u.area === 'approach' && u.status === 'demonstrated' && u.quote)
+        .map((u) => u.quote as string)
+      const record = next.evidence.approach
+      next = {
+        ...next,
+        evidence: { ...next.evidence, approach: { ...record, creditedQuotes: fresh } },
+      }
     }
   }
 

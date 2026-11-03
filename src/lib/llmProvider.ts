@@ -237,7 +237,7 @@ const ACTION_BRIEF: Record<string, string> = {
   clarify:
     'You do not understand their approach well enough to judge it. Ask them to walk it through on the example, or to say what happens at one specific step. Do not guess at what they meant and do not steer them elsewhere.',
   repair:
-    'Their explanation or code contains a correctness issue or conflicts with earlier evidence. Ask ONE question about the specific issue, using a small counterexample if helpful. Never say "wrong" or "no".',
+    'Their explanation or code contains a correctness issue or conflicts with earlier evidence. Ask ONE question about the specific issue, using a small counterexample if helpful. Give only the input and ask what their method returns: do not trace it, sort it, or state the result for them, so finding the issue stays theirs. Never say "wrong" or "no".',
   light_hint: 'Give one concrete clue for the specific gap in the latest reply, then one short question.',
   stronger_hint:
     'State the missing relationship explicitly and illustrate it briefly. This must give more information than the previous hint, not just change the question or example. Ask one short application question.',

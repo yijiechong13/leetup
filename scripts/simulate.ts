@@ -822,6 +822,49 @@ section('CIRCLING ONE AREA ESCALATES')
   check('the stall after it reaches a hint', stall.action, 'light_hint')
 }
 
+section('HELP CARRIES TO THE NEXT REPLY')
+{
+  // Live run: a stronger hint on correctness spelled out "look up before
+  // storing"; the reply also earned requirements, which came out independent.
+  const hinted = {
+    ...sessionWith({ focusArea: 'correctness' }),
+    assistance: { ...sessionWith().assistance, correctness: 2 },
+  }
+  hinted.messages = [...hinted.messages, { id: 'h', role: 'assistant' as const, text: 'hint', area: 'correctness' as const, kind: 'hint' as const }]
+  const credit = applyPolicy(hinted, assessment({
+    demonstrated: [
+      { area: 'correctness', quote: 'At index 1 the map has 3 at 0, so it returns [0, 1].', adequate: true, confidence: 0.9 },
+      { area: 'requirements', quote: 'Looking up before storing means an element can never match itself.', adequate: true, confidence: 0.9 },
+    ],
+  }), problem)
+  const after = applyDecision(hinted, credit, problem)
+  check('the hinted area is recorded as supported', after.evidence.correctness.support, 'after-hints')
+  check('so is another area credited from the same reply', after.evidence.requirements.support, 'after-hints')
+
+  const unhinted = { ...hinted, messages: hinted.messages.slice(0, -1) }
+  const plain = applyDecision(unhinted, applyPolicy(unhinted, assessment({
+    demonstrated: [{ area: 'requirements', quote: 'Looking up before storing means an element can never match itself.', adequate: true, confidence: 0.9 }],
+  }), problem), problem)
+  check('without a hint just before, it stays independent', plain.evidence.requirements.support, 'independent')
+}
+
+section('A SWITCH DROPS THE OLD APPROACH QUOTE')
+{
+  // Live run: after switching from nested loops to a map, the summary quoted
+  // both algorithms as evidence for the approach.
+  const oldQuote = 'for each i, check every j starting at i+1'
+  const nested = applyDecision(sessionWith(), applyPolicy(sessionWith(), assessment({
+    approach: { name: 'Nested loops', changedFrom: null, unfamiliar: false },
+    demonstrated: [{ area: 'approach', quote: oldQuote, adequate: true, confidence: 0.9 }],
+  }), problem), problem)
+  const newQuote = 'check whether target - nums[i] is already in the map, otherwise store it'
+  const switched = applyDecision(nested, applyPolicy(nested, assessment({
+    approach: { name: 'One-pass hash map', changedFrom: 'Nested loops', unfamiliar: false },
+    demonstrated: [{ area: 'approach', quote: newQuote, adequate: true, confidence: 0.9 }],
+  }), problem), problem)
+  check('approach evidence cites only the new algorithm', switched.evidence.approach.creditedQuotes, [newQuote])
+}
+
 section('ONE EDGE CASE AND HONEST SUMMARY')
 {
   const weak = 'its correct already because they guarantee one solution'
