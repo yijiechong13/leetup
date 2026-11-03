@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1420 645" width="1420" height="645" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" fill="#1f2328">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f8a4f"/></marker>
+    <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c5cc4"/></marker>
+    <style>
+      .t { font-weight: 600; font-size: 16px; }
+      .c { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12.5px; fill: #1f2328; }
+      .s { font-size: 12.5px; fill: #4b5563; }
+      .h { font-weight: 600; fill: #2f6f45; font-size: 14px; }
+    </style>
+  </defs>
+  <rect width="1420" height="645" fill="#ffffff"/>
+
+  <text x="30" y="38" font-size="20" font-weight="700">LeetUP architecture</text>
+
+  <!-- LLM API -->
+  <rect x="230" y="70" width="1010" height="56" rx="8" fill="#f1ecfb" stroke="#7c5cc4"/>
+  <text x="735" y="104" class="t" text-anchor="middle">LLM API (Anthropic Claude)</text>
+
+  <!-- Pipeline row -->
+  <g text-anchor="middle">
+    <rect x="30" y="190" width="170" height="110" rx="8" fill="#f5f5f4" stroke="#8a8a85"/>
+    <text x="115" y="238" class="t">Learner types</text>
+    <text x="115" y="264" class="s">text or code</text>
+
+    <rect x="230" y="190" width="170" height="110" rx="8" fill="#f1ecfb" stroke="#7c5cc4"/>
+    <text x="315" y="238" class="t">1 · Assess</text>
+    <text x="315" y="264" class="s">LLM reports evidence</text>
+
+    <rect x="430" y="190" width="170" height="110" rx="8" fill="#eef4fb" stroke="#4a78b5"/>
+    <text x="515" y="238" class="t">2 · Validate</text>
+    <text x="515" y="264" class="s">quotes must be real</text>
+
+    <rect x="630" y="190" width="170" height="110" rx="8" fill="#eef4fb" stroke="#4a78b5"/>
+    <text x="715" y="238" class="t">3 · Decide</text>
+    <text x="715" y="264" class="s">rules pick the move</text>
+
+    <rect x="830" y="190" width="170" height="110" rx="8" fill="#eef4fb" stroke="#4a78b5"/>
+    <text x="915" y="238" class="t">4 · Update</text>
+    <text x="915" y="264" class="s">record progress + help</text>
+
+    <rect x="1030" y="190" width="170" height="110" rx="8" fill="#f1ecfb" stroke="#7c5cc4"/>
+    <text x="1115" y="238" class="t">5 · Reply</text>
+    <text x="1115" y="264" class="s">LLM phrases the move</text>
+
+    <rect x="1230" y="190" width="170" height="110" rx="8" fill="#f5f5f4" stroke="#8a8a85"/>
+    <text x="1315" y="238" class="t">Learner sees</text>
+    <text x="1315" y="264" class="s">reply + checklist</text>
+  </g>
+
+  <!-- flow arrows -->
+  <g stroke="#4b5563" stroke-width="1.6">
+    <line x1="200" y1="245" x2="228" y2="245" marker-end="url(#a)"/>
+    <line x1="400" y1="245" x2="428" y2="245" marker-end="url(#a)"/>
+    <line x1="600" y1="245" x2="628" y2="245" marker-end="url(#a)"/>
+    <line x1="800" y1="245" x2="828" y2="245" marker-end="url(#a)"/>
+    <line x1="1000" y1="245" x2="1028" y2="245" marker-end="url(#a)"/>
+    <line x1="1200" y1="245" x2="1228" y2="245" marker-end="url(#a)"/>
+  </g>
+
+  <!-- LLM calls -->
+  <line x1="315" y1="128" x2="315" y2="188" stroke="#7c5cc4" stroke-width="1.6" marker-start="url(#p)" marker-end="url(#p)"/>
+  <line x1="1115" y1="128" x2="1115" y2="188" stroke="#7c5cc4" stroke-width="1.6" marker-start="url(#p)" marker-end="url(#p)"/>
+
+  <!-- Reasoning areas -->
+  <rect x="30" y="390" width="170" height="192" rx="8" fill="#ffffff" stroke="#3a9a5b" stroke-width="1.5"/>
+  <text x="46" y="416" class="t">Reasoning areas</text>
+  <text x="46" y="440" class="h">Required</text>
+  <text x="46" y="460" class="c">approach</text>
+  <text x="46" y="478" class="c">justification</text>
+  <text x="46" y="496" class="c">correctness</text>
+  <text x="46" y="514" class="c">complexity</text>
+  <text x="46" y="536" class="h">Optional</text>
+  <text x="46" y="554" class="c">requirements</text>
+  <text x="46" y="571" class="c">comparison</text>
+
+  <!-- Session state -->
+  <rect x="230" y="390" width="1170" height="192" rx="8" fill="#eef8f1" stroke="#3a9a5b" stroke-width="1.5"/>
+  <text x="250" y="418" class="t">SessionState</text>
+  <text x="372" y="418" class="s">one object per session, updated every turn</text>
+
+  <g>
+    <rect x="246" y="434" width="218" height="124" rx="6" fill="#ffffff" stroke="#3a9a5b" stroke-opacity="0.6"/>
+    <line x1="246" y1="464" x2="464" y2="464" stroke="#3a9a5b" stroke-opacity="0.4"/>
+    <text x="260" y="455" class="h">Evidence</text>
+    <text x="450" y="455" class="s" text-anchor="end">per area</text>
+    <text x="260" y="486" class="c">status</text>
+    <text x="260" y="506" class="c">support</text>
+    <text x="260" y="526" class="c">quotes</text>
+    <text x="260" y="546" class="c">gap</text>
+
+    <rect x="476" y="434" width="218" height="124" rx="6" fill="#ffffff" stroke="#3a9a5b" stroke-opacity="0.6"/>
+    <line x1="476" y1="464" x2="694" y2="464" stroke="#3a9a5b" stroke-opacity="0.4"/>
+    <text x="490" y="455" class="h">SupportLadder</text>
+    <text x="680" y="455" class="s" text-anchor="end">per area</text>
+    <text x="490" y="486" class="c">attention</text>
+    <text x="490" y="506" class="c">assistance</text>
+
+    <rect x="706" y="434" width="218" height="124" rx="6" fill="#ffffff" stroke="#3a9a5b" stroke-opacity="0.6"/>
+    <line x1="706" y1="464" x2="924" y2="464" stroke="#3a9a5b" stroke-opacity="0.4"/>
+    <text x="720" y="455" class="h">Navigation</text>
+    <text x="720" y="486" class="c">focusArea</text>
+    <text x="720" y="506" class="c">phase</text>
+    <text x="720" y="526" class="c">awaitingCheck</text>
+    <text x="720" y="546" class="c">deferredAreas</text>
+
+    <rect x="936" y="434" width="218" height="124" rx="6" fill="#ffffff" stroke="#3a9a5b" stroke-opacity="0.6"/>
+    <line x1="936" y1="464" x2="1154" y2="464" stroke="#3a9a5b" stroke-opacity="0.4"/>
+    <text x="950" y="455" class="h">Approach</text>
+    <text x="950" y="486" class="c">name</text>
+    <text x="950" y="506" class="c">description</text>
+    <text x="950" y="526" class="c">changedFrom</text>
+
+    <rect x="1166" y="434" width="218" height="124" rx="6" fill="#ffffff" stroke="#3a9a5b" stroke-opacity="0.6"/>
+    <line x1="1166" y1="464" x2="1384" y2="464" stroke="#3a9a5b" stroke-opacity="0.4"/>
+    <text x="1180" y="455" class="h">Conversation</text>
+    <text x="1180" y="486" class="c">messages</text>
+    <text x="1180" y="506" class="c">turn</text>
+  </g>
+
+  <line x1="200" y1="486" x2="242" y2="486" stroke="#3a9a5b" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#g)"/>
+
+  <!-- read / write -->
+  <g stroke="#4b5563" stroke-width="1.4" stroke-dasharray="5 4">
+    <line x1="315" y1="388" x2="315" y2="303" marker-end="url(#a)"/>
+    <line x1="715" y1="388" x2="715" y2="303" marker-end="url(#a)"/>
+    <line x1="1115" y1="388" x2="1115" y2="303" marker-end="url(#a)"/>
+    <line x1="1315" y1="388" x2="1315" y2="303" marker-end="url(#a)"/>
+  </g>
+  <line x1="915" y1="302" x2="915" y2="386" stroke="#2f8a4f" stroke-width="2.4" marker-end="url(#g)"/>
+  <text x="924" y="350" class="s" fill="#2f8a4f">writes</text>
+  <text x="724" y="350" class="s">reads</text>
+
+  <!-- legend -->
+  <rect x="30" y="612" width="14" height="14" rx="3" fill="#f1ecfb" stroke="#7c5cc4"/>
+  <text x="52" y="624" class="s">LLM call</text>
+  <rect x="135" y="612" width="14" height="14" rx="3" fill="#eef4fb" stroke="#4a78b5"/>
+  <text x="157" y="624" class="s">Deterministic code</text>
+  <rect x="300" y="612" width="14" height="14" rx="3" fill="#f5f5f4" stroke="#8a8a85"/>
+  <text x="322" y="624" class="s">Learner interface</text>
+  <line x1="460" y1="619" x2="492" y2="619" stroke="#4b5563" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#a)"/>
+  <text x="500" y="624" class="s">Reads state</text>
+  <line x1="600" y1="619" x2="632" y2="619" stroke="#2f8a4f" stroke-width="2.4" marker-end="url(#g)"/>
+  <text x="640" y="624" class="s">Writes state</text>
+</svg>
