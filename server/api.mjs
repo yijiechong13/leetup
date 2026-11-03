@@ -17,7 +17,8 @@ const model = () => process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5'
 const codeVersion = () => {
   try {
     const commit = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
-    const dirty = execSync('git status --porcelain', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    // Test outputs saved during a run are not code changes.
+    const dirty = execSync("git status --porcelain -- . ':!red_team' ':!llm_judge' ':!dev_logs' ':!ai_logs'", { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
     return dirty ? `${commit}-dirty` : commit
   } catch {
     return 'unknown'
