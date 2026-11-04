@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Judge Results</title>
+<style>
+:root { --ink: #1c1c1a; --muted: #6a6964; --line: #d9d7d0; --head: #f3f2ee; --final: #eef3ff; --final-edge: #3b5bdb;
+  --pass: #1f6b3a; --pass-bg: #e6f4ea; --fail: #a8321c; --fail-bg: #fbe9e5; --dis: #fff1c9; --dis-edge: #d39e00; }
+* { box-sizing: border-box; }
+html, body { background: #ffffff; color: var(--ink); }
+body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 880px; margin: 0 auto; padding: 28px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.lede { color: var(--muted); margin: 0 0 24px; }
+h2 { font-size: 16px; margin: 28px 0 4px; }
+.cap { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: middle; }
+th { background: var(--head); font-weight: 600; font-size: 13px; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+tr.final td { background: var(--final); font-weight: 600; }
+tr.final td:first-child { box-shadow: inset 3px 0 var(--final-edge); }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; color: var(--final-edge); border: 1px solid var(--final-edge); border-radius: 3px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+.v { display: inline-block; min-width: 40px; text-align: center; font-size: 12px; font-weight: 600; border-radius: 3px; padding: 1px 6px; }
+.v-pass { color: var(--pass); background: var(--pass-bg); }
+.v-fail { color: var(--fail); background: var(--fail-bg); }
+td.dis { background: var(--dis); box-shadow: inset 0 0 0 2px var(--dis-edge); }
+.sub { color: var(--muted); font-size: 12px; }
+.key { display: inline-block; width: 12px; height: 12px; background: var(--dis); box-shadow: inset 0 0 0 2px var(--dis-edge); vertical-align: -1px; margin-right: 4px; }
+.note { margin-top: 28px; padding: 10px 14px; border-left: 3px solid var(--line); color: var(--muted); font-size: 13px; }
+.note p { margin: 4px 0; }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+<main>
+<h1>LLM judge results</h1>
+<p class="lede">20 simulated conversations, labelled by hand and judged per criterion (C1: credit matches the learner's own reasoning; C2: help matches the learner's difficulty).</p>
+
+<h2>1. Judge–human agreement</h2>
+<p class="cap">Agreement and Cohen's kappa against my labels, all 20 conversations. Final prompt versions highlighted.</p>
+<div class="scroll"><table>
+  <thead><tr><th>Criterion</th><th>Judge prompt</th><th class="num">Agreement</th><th class="num">Cohen's κ</th>
+    <th class="num">You PASS /<br>judge PASS</th><th class="num">You PASS /<br>judge FAIL</th><th class="num">You FAIL /<br>judge PASS</th><th class="num">You FAIL /<br>judge FAIL</th></tr></thead>
+  <tbody><tr class="">
+    <td>C1</td><td>v2</td>
+    <td class="num">10/20 = 50.0%</td><td class="num">0.010</td>
+    <td class="num">5</td><td class="num">6</td><td class="num">4</td><td class="num">5</td>
+  </tr><tr class="final">
+    <td>C1</td><td>v3 <span class="tag">final</span></td>
+    <td class="num">18/20 = 90.0%</td><td class="num">0.794</td>
+    <td class="num">11</td><td class="num">0</td><td class="num">2</td><td class="num">7</td>
+  </tr><tr class="">
+    <td>C2</td><td>v2</td>
+    <td class="num">12/20 = 60.0%</td><td class="num">0.000</td>
+    <td class="num">12</td><td class="num">0</td><td class="num">8</td><td class="num">0</td>
+  </tr><tr class="">
+    <td>C2</td><td>v3</td>
+    <td class="num">13/20 = 65.0%</td><td class="num">0.146</td>
+    <td class="num">12</td><td class="num">0</td><td class="num">7</td><td class="num">1</td>
+  </tr><tr class="final">
+    <td>C2</td><td>v4 <span class="tag">final</span></td>
+    <td class="num">16/20 = 80.0%</td><td class="num">0.583</td>
+    <td class="num">10</td><td class="num">2</td><td class="num">2</td><td class="num">6</td>
+  </tr></tbody>
+</table></div>
+
+<h2>2. Pass rates, final system</h2>
+<p class="cap">My labels for the 15 conversations with the final system (C01–C15, commit 93b6730).</p>
+<div class="scroll"><table>
+  <thead><tr><th>Criterion</th><th class="num">PASS</th><th class="num">FAIL</th><th class="num">Pass rate</th></tr></thead>
+  <tbody><tr><td>C1</td><td class="num">8</td><td class="num">7</td><td class="num">8/15 = 53.3%</td></tr><tr><td>C2</td><td class="num">10</td><td class="num">5</td><td class="num">10/15 = 66.7%</td></tr></tbody>
+</table></div>
+
+<h2>3. Per-conversation verdicts</h2>
+<p class="cap">My labels against the final judge prompts (C1 v3, C2 v4). <span class="key"></span>Disagreement (6 in total).</p>
+<div class="scroll"><table>
+  <thead><tr><th>ID</th><th>Persona</th><th>Version</th><th>My C1</th><th>Judge C1 (v3)</th><th>My C2</th><th>Judge C2 (v4)</th></tr></thead>
+  <tbody><tr>
+    <td><b>C01</b></td><td>P1</td><td>93b6730</td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+  </tr><tr>
+    <td><b>C02</b></td><td>P2</td><td>93b6730</td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C03</b></td><td>P3</td><td>93b6730</td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C04</b></td><td>P4</td><td>93b6730</td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C05</b></td><td>P5</td><td>93b6730</td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C06</b></td><td>P1</td><td>93b6730</td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C07</b></td><td>P2</td><td>93b6730</td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+    <td class="dis"><span class="v v-pass">PASS</span></td><td class="dis"><span class="v v-fail">FAIL</span></td>
+  </tr><tr>
+    <td><b>C08</b></td><td>P3</td><td>93b6730</td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C09</b></td><td>P4</td><td>93b6730</td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+  </tr><tr>
+    <td><b>C10</b></td><td>P5</td><td>93b6730</td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C11</b></td><td>P6</td><td>93b6730</td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+  </tr><tr>
+    <td><b>C12</b></td><td>P7</td><td>93b6730</td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+  </tr><tr>
+    <td><b>C13</b></td><td>P8</td><td>93b6730</td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class="dis"><span class="v v-pass">PASS</span></td><td class="dis"><span class="v v-fail">FAIL</span></td>
+  </tr><tr>
+    <td><b>C14</b></td><td>P9</td><td>93b6730</td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+    <td class="dis"><span class="v v-fail">FAIL</span></td><td class="dis"><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C15</b></td><td>P10</td><td>93b6730</td>
+    <td class="dis"><span class="v v-fail">FAIL</span></td><td class="dis"><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C16</b></td><td>P2</td><td>41666c4 <span class="sub">(should fail C2)</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+  </tr><tr>
+    <td><b>C17</b></td><td>P9</td><td>41666c4 <span class="sub">(should fail C2)</span></td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+    <td class="dis"><span class="v v-fail">FAIL</span></td><td class="dis"><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C18</b></td><td>P3</td><td>41666c4 <span class="sub">(should fail C2)</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-fail">FAIL</span></td><td class=""><span class="v v-fail">FAIL</span></td>
+  </tr><tr>
+    <td><b>C19</b></td><td>P10</td><td>f2e4fa1 <span class="sub">(should fail C1)</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr><tr>
+    <td><b>C20</b></td><td>P4</td><td>f2e4fa1 <span class="sub">(should fail C1)</span></td>
+    <td class="dis"><span class="v v-fail">FAIL</span></td><td class="dis"><span class="v v-pass">PASS</span></td>
+    <td class=""><span class="v v-pass">PASS</span></td><td class=""><span class="v v-pass">PASS</span></td>
+  </tr></tbody>
+</table></div>
+
+<div class="note">
+  <p>One C2 label (C09) was corrected after the v4 run; see <code>llm_judge/label_changes.md</code>. Agreement uses the corrected labels.</p>
+</div>
+</main>
+</body>
+</html>
