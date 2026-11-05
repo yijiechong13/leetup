@@ -13,10 +13,12 @@
  * Usage:
  *   npx tsx scripts/judge.ts                       # c1_v1 and c2_v1
  *   npx tsx scripts/judge.ts --criterion c1 --version v2
+ *   npx tsx scripts/judge.ts --criterion c2 --version v5 --problem-context
  *   npx tsx scripts/judge.ts --score-only          # recompute agreement from saved results
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { problemBank } from '../src/data/problemBank'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const DIR = join(ROOT, 'llm_judge')
@@ -35,6 +37,16 @@ const version = arg('version') ?? 'v1'
 const criteria = (arg('criterion') ?? 'c1,c2').toLowerCase().split(',')
 const only = arg('only')?.split(',') // e.g. --only C03,C07
 const scoreOnly = flag('score-only')
+const includeProblem = flag('problem-context')
+if (!scoreOnly && criteria.includes('c2') && ['v5', 'v6'].includes(version) && !includeProblem) {
+  throw new Error('C2 v5 and v6 require --problem-context so the judge can tell a wrong answer from a correct one.')
+}
+
+/** C2 was narrowed in criteria_v3.md; v1–v4 are scored against the original C2 labels. */
+function labelColumn(criterion: string): string {
+  const C = criterion.toUpperCase()
+  return C === 'C2' && ['v1', 'v2', 'v3', 'v4'].includes(version) ? 'C2_original_label' : `${C}_label`
+}
 const CONCURRENCY = 4
 
 /* ---------------- CSV ---------------- */
@@ -95,7 +107,7 @@ function agreement(pairs: ['PASS' | 'FAIL', 'PASS' | 'FAIL'][]) {
 function report(criterion: string, results: Record<string, string>[]) {
   const C = criterion.toUpperCase()
   const labels = existsSync(LABELS) ? parseCsv(readFileSync(LABELS, 'utf8')) : []
-  const human = new Map(labels.map((r) => [r.conversation_id, normalise(r[`${C}_label`])]))
+  const human = new Map(labels.map((r) => [r.conversation_id, normalise(r[labelColumn(criterion)])]))
   const pairs: ['PASS' | 'FAIL', 'PASS' | 'FAIL'][] = []
   const disagreements: string[] = []
   for (const r of results) {
@@ -143,11 +155,31 @@ function lastVerdictJson(raw: string): { verdict?: string; reason?: string } {
   return extractJson(loose ?? raw)
 }
 
+/** Supply the problem statement separately from the reusable criterion; no solution guidance. */
+function buildJudgeInput(transcript: string): string {
+  const conversation = `<conversation>\n${transcript}\n</conversation>`
+  if (!includeProblem) return conversation
+  const problemId = transcript.match(/^# LeetUP session\s*[–—-]\s*(\S+)/m)?.[1]
+  const problem = problemBank.find((entry) => entry.id === problemId)
+  if (!problem) throw new Error(`Cannot supply problem context: unknown transcript problem ${problemId ?? '(missing)'}`)
+  return [
+    '<problem>',
+    problem.title,
+    problem.statement,
+    'Constraints:',
+    ...problem.constraints.map((constraint) => `- ${constraint}`),
+    problem.followUp ? `Optional follow-up (not required for completion): ${problem.followUp}` : '',
+    '</problem>',
+    conversation,
+  ].filter(Boolean).join('\n')
+}
+
 async function judgeOne(system: string, transcript: string) {
+  const input = buildJudgeInput(transcript)
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const raw = await chatCompletion(
-        [{ role: 'system', content: system }, { role: 'user', content: `<conversation>\n${transcript}\n</conversation>` }],
+        [{ role: 'system', content: system }, { role: 'user', content: input }],
         { maxTokens: 6000 },
       )
       const out = lastVerdictJson(raw)

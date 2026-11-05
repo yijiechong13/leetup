@@ -17,9 +17,13 @@ const RUNS: { criterion: 'C1' | 'C2'; version: string; final: boolean }[] = [
   { criterion: 'C1', version: 'v3', final: true },
   { criterion: 'C2', version: 'v2', final: false },
   { criterion: 'C2', version: 'v3', final: false },
-  { criterion: 'C2', version: 'v4', final: true },
+  { criterion: 'C2', version: 'v4', final: false },
+  { criterion: 'C2', version: 'v5', final: false },
+  { criterion: 'C2', version: 'v6', final: true },
 ]
-const FINAL = { C1: 'v3', C2: 'v4' } as const
+const FINAL = { C1: 'v3', C2: 'v6' } as const
+/** C2 was narrowed in criteria_v3.md; v1–v4 judged the original C2 and are scored against the original C2 labels. */
+const ORIGINAL_C2 = ['v1', 'v2', 'v3', 'v4']
 
 function parseCsv(text: string): Record<string, string>[] {
   const rows: string[][] = []
@@ -59,7 +63,7 @@ const verdicts = (criterion: string, version: string) => new Map(
 function agreement(criterion: 'C1' | 'C2', version: string) {
   const judge = verdicts(criterion, version)
   const pairs = labels
-    .map((l) => [norm(l[`${criterion}_label`]), judge.get(l.conversation_id) ?? ''] as const)
+    .map((l) => [norm(l[criterion === 'C2' && ORIGINAL_C2.includes(version) ? 'C2_original_label' : `${criterion}_label`]), judge.get(l.conversation_id) ?? ''] as const)
     .filter(([h, j]) => h && j)
   const n = pairs.length
   const count = (h: string, j: string) => pairs.filter(([a, b]) => a === h && b === j).length
@@ -80,7 +84,7 @@ const verdict = (v: string) => `<span class="v v-${v.toLowerCase() || 'none'}">$
 const agreementRows = RUNS.map(({ criterion, version, final }) => {
   const a = agreement(criterion, version)
   return `<tr class="${final ? 'final' : ''}">
-    <td>${criterion}</td><td>${version}${final ? ' <span class="tag">final</span>' : ''}</td>
+    <td>${criterion}${criterion === 'C2' && ORIGINAL_C2.includes(version) ? ' (original)' : ''}</td><td>${version}${final ? ' <span class="tag">final</span>' : ''}</td>
     <td class="num">${a.agree}/${a.n} = ${pct(a.po)}</td><td class="num">${kappaText(a.kappa)}</td>
     <td class="num">${a.pp}</td><td class="num">${a.pf}</td><td class="num">${a.fp}</td><td class="num">${a.ff}</td>
   </tr>`
@@ -154,10 +158,10 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 <body>
 <main>
 <h1>LLM judge results</h1>
-<p class="lede">20 simulated conversations, labelled by hand and judged per criterion (C1: credit matches the learner's own reasoning; C2: help matches the learner's difficulty).</p>
+<p class="lede">${labels.length} simulated conversations, labelled by hand and judged per criterion (C1: checklist completion and assistance labels match the learner's demonstrated reasoning; C2: support adds a narrower question, clue or explanation when the learner remains stuck).</p>
 
 <h2>1. Judge–human agreement</h2>
-<p class="cap">Agreement and Cohen's kappa against my labels, all 20 conversations. Final prompt versions highlighted.</p>
+<p class="cap">Agreement and Cohen's kappa against my labels. C1 v2 and C2 (original) v2–v4 were run on C01–C20; C2 (original) is scored against my original C2 labels. C1 v3 and C2 v5–v6 were run on all ${labels.length}. Final prompt versions highlighted.</p>
 <div class="scroll"><table>
   <thead><tr><th>Criterion</th><th>Judge prompt</th><th class="num">Agreement</th><th class="num">Cohen's κ</th>
     <th class="num">You PASS /<br>judge PASS</th><th class="num">You PASS /<br>judge FAIL</th><th class="num">You FAIL /<br>judge PASS</th><th class="num">You FAIL /<br>judge FAIL</th></tr></thead>
@@ -178,9 +182,6 @@ code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
   <tbody>${convRows}</tbody>
 </table></div>
 
-<div class="note">
-  <p>One C2 label (C09) was corrected after the v4 run; see <code>llm_judge/label_changes.md</code>. Agreement uses the corrected labels.</p>
-</div>
 </main>
 </body>
 </html>

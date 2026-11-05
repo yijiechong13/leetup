@@ -34,7 +34,11 @@ The learner is the person typing in the chat. For each learner message, LeetUP c
 
 ### Session state
 
-`SessionState` in `src/types.ts` is the record the policy reads and the Update step writes. Entity names group its fields by purpose; field names match the code. DG1–DG3 are the design goals: scaffold productive struggle while reducing drop-off (DG1), make learner reasoning explicit (DG2), and adapt support to individual reasoning gaps (DG3).
+`SessionState` in `src/types.ts` is the record the policy reads and the Update step writes. Entity names group its fields by purpose; field names match the code. The "Why it is needed" column links each field to these design goals:
+
+- **DG1:** Scaffold productive struggle through progressively clearer help when learners remain stuck, reducing the risk of drop-off.
+- **DG2:** Make learner reasoning explicit by eliciting explanations, basing completion on the learner's own explanations, and recording any assistance received.
+- **DG3:** Address the learner's specific reasoning gaps while supporting their proposed approach, including correct slower methods.
 
 | Entity | Field | What it stores | Why it is needed |
 |---|---|---|---|
@@ -59,3 +63,41 @@ Reasoning areas: approach, justification, correctness and complexity are require
 Run `npm run build`, `npm run lint`, and `npm run simulate` to check the implementation.
 
 Useful partial answers receive ordinary follow-up questions. Hint escalation depends on confusion or lack of progress, rather than total conversation length. Earlier assistance remains recorded even after the learner starts making progress. Known solutions in `scripts/fixtures/approaches.ts` are offline evaluation material, not part of the live tutoring flow.
+
+## Tests
+
+### LLM judge (`llm_judge/`)
+
+- `personas.md`: the ten learner personas and which conversations were run on which version.
+- `learner_prompts/`: the prompt that turns a persona into a simulated learner (`learner_v2.md` was used; `learner_v1.md` is the pilot version).
+- `conversations/`: the 23 test conversations (C01–C23), exported in LeetUP's Markdown log format.
+- `criteria_v1.md`–`criteria_v3.md`: the criteria. The final criteria are in `criteria_v3.md`:
+  - **C1:** Checklist completion and assistance labels match the learner's demonstrated reasoning (DG2).
+  - **C2:** Support adds a narrower question, clue or explanation when the learner remains stuck (DG1).
+- `judge_prompts/`: every judge prompt version. The final prompts are `c1_v3.md` and `c2_v6.md`. C2 v1–v4 judged the original, broader C2; v5–v6 judge the narrowed C2 in `criteria_v3.md`.
+- `labels.csv`: my PASS/FAIL label and reason for every conversation and criterion. `C2_original_label` holds my labels for the original C2, used to score C2 v1–v4.
+- `judge_results/`: the judge's verdict and reason per conversation for each prompt version, with the full judge replies in `raw/` for the runs that saved them (C2 v4–v6, and C1 v3 on C21–C23).
+- `results.html`: agreement (percentage and Cohen's kappa), final-system pass rates and per-conversation verdicts, built from the files above.
+
+The conversations were generated with `scripts/simulate-learners.ts`, which runs LeetUP's real tutoring pipeline with an LLM playing the learner. Earlier versions were run from a git worktree of that commit. With `npm run dev` running:
+
+```bash
+npx tsx scripts/simulate-learners.ts --persona P2 --id C21 --src <worktree of 41666c4>
+npx tsx scripts/judge.ts --criterion c1 --version v3
+npx tsx scripts/judge.ts --criterion c2 --version v6 --problem-context
+npx tsx scripts/judge.ts --criterion c1,c2 --version v3 --score-only
+npx tsx scripts/build-results-page.ts
+```
+
+`--problem-context` gives the judge the problem statement alongside the conversation (required for C2 v5–v6). `--score-only` recomputes agreement from saved verdicts without calling the model. The judge uses the same model as LeetUP.
+
+### Red-teaming (`red_team/`)
+
+- `plan.md`: the two targets, PASS/FAIL rules, all six attempts and the results log for every run.
+- `runs/` and `after-fix/`: exported transcripts before and after the fixes (commits `c6c8bdd` and `314a8ad`).
+- `screenshots/`: screenshots of each run in the running system.
+
+## AI use
+
+Records of my conversations with AI tools for this assignment are in `ai_logs/`.
+
