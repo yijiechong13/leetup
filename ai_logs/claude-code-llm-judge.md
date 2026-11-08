@@ -2,6 +2,7 @@
 
 - Session: LeetUP LLM judge test set
 - Exported from the Claude desktop app (Code tab). Tool inputs and results are included; results longer than 2,000 characters are truncated. Model thinking and internal app records are omitted.
+- Note: this session used `llm_judge/criteria_v2.md`, so C2 v1–v4 here judge the original, broader C2. C2 was later narrowed in `llm_judge/criteria_v3.md` (commit `289d3b8`), which added judge prompts `c2_v5` and `c2_v6` and conversations C21–C23. The final C2 prompt is `c2_v6`; final results are in `llm_judge/results.html` and the README. That work was done in a different session; its transcript excerpt is in `ai_logs/claude-code-c2-narrowing.md`.
 
 ---
 
