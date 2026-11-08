@@ -34,33 +34,35 @@ The learner is the person typing in the chat. For each learner message, LeetUP c
 
 ### Session state
 
-`SessionState` in `src/types.ts` is the record the policy reads and the Update step writes. Entity names group its fields by purpose; field names match the code. The "Why it is needed" column links each field to these design goals:
+`SessionState` in `src/types.ts` is the record the policy reads. Each turn, stage 4 prepares an updated copy of it; stage 6 commits that copy only after the reply is generated. If a Claude call fails, the copy is discarded and evidence and hint levels stay as they were. Entity names group its fields by purpose; field names match the code. The "Why it is needed" column links each field to these design goals:
 
-- **DG1:** Scaffold productive struggle through progressively clearer help when learners remain stuck, reducing the risk of drop-off.
+- **DG1:** Scaffold productive struggle through progressively clearer help when learners remain stuck, with the aim of reducing learner drop-off.
 - **DG2:** Make learner reasoning explicit by eliciting explanations, basing completion on the learner's own explanations, and recording any assistance received.
-- **DG3:** Address the learner's specific reasoning gaps while supporting their proposed approach, including correct slower methods.
+- **DG3:** Address specific gaps in the learner's reasoning about their proposed approach, helping them correct flaws while accepting valid approaches, including slower methods.
 
-| Entity | Field | What it stores | Why it is needed |
-|---|---|---|---|
-| **Evidence**<br>(one per reasoning area) | `status` | Whether the learner has explained this area:<br>i. unaddressed: no evidence yet<br>ii. partial: incomplete explanation<br>iii. demonstrated: adequate explanation<br>iv. revisit: reasoning requires reassessment after a contradiction or approach change | The session completes only when all four required areas are demonstrated (DG2) |
-| | `support` | How the learner got there:<br>i. independent (no help)<br>ii. after hints<br>iii. after guidance (the tutor explained it) | Preserves the help received when reporting progress (DG1, DG2) |
-| | `quotes` | Learner quotations recorded for the area, including partial evidence | Grounds the assessment in the learner's actual contributions (DG2) |
-| | `creditedQuotes` | Quotations used when the area was marked demonstrated | Allows the summary to cite the evidence that earned credit, rather than a later incomplete reply (DG2) |
-| | `gap` | Missing reasoning or a misconception that remains unresolved | Provides a specific target for the next question or hint (DG3) |
-| **SupportLadder**<br>(one per reasoning area) | `attention` | A questioning counter used to track unresolved reasoning. Adequate progress can reset it; a first partial attempt can hold it without resetting it | Helps the policy recognise when further questioning should give way to support. Explicit help requests can advance support sooner (DG1) |
-| | `assistance` | Strongest help already given:<br>i. 0 none<br>ii. 1 light hint<br>iii. 2 stronger hint<br>iv. 3 guided explanation | Selects the next support level and preserves assistance history even after progress (DG1) |
-| **Navigation** | `focusArea` | The reasoning area currently being addressed | Keeps the response focused on a particular gap (DG3) |
-| | `phase` | i. opening<br>ii. exploring<br>iii. paused<br>iv. complete | Distinguishes completion from a pause with unresolved reasoning |
-| | `awaitingCheck` | An area explained through guidance that the learner has not yet applied | Prevents a tutor-provided explanation from automatically becoming learner credit (DG2) |
-| | `deferredAreas` | Unresolved areas set aside after the learner could not apply a guided explanation | Avoids repeatedly questioning the same unresolved point. The learner can still demonstrate it later (DG1) |
-| **Approach** | `selectedApproach.name`, `description` | A label and concrete description of the learner's proposed algorithm | Keeps assessment and support aligned with the learner's own steps (DG3) |
-| | `selectedApproach.changedFrom` | The preceding approach when the learner changes algorithms | Identifies reasoning that may need reassessment for the new algorithm |
-| **Conversation** | `messages` | Learner and tutor messages, including labels such as question, hint, repair, and summary | Supplies conversational context and helps determine whether subsequent evidence followed assistance |
-| | `turn` | The current learner-turn number | Supports ordering and exported test records |
+| Entity                                        | Field                                  | What it stores                                                                                                                                                                                                                                             | Why it is needed                                                                                                                        |
+| --------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Evidence**<br>(one per reasoning area)      | `status`                               | Whether the learner has explained this area:<br>i. unaddressed: no evidence yet<br>ii. partial: incomplete explanation<br>iii. demonstrated: adequate explanation<br>iv. revisit: reasoning requires reassessment after a contradiction or approach change | The session completes only when all four required areas are demonstrated (DG2)                                                          |
+|                                               | `support`                              | How the learner got there:<br>i. independent (no help)<br>ii. after hints<br>iii. after guidance (the tutor explained it)                                                                                                                                  | Preserves the help received when reporting progress (DG1, DG2)                                                                          |
+|                                               | `quotes`                               | Learner quotations recorded for the area, including partial evidence                                                                                                                                                                                       | Grounds the assessment in the learner's actual contributions (DG2)                                                                      |
+|                                               | `creditedQuotes`                       | Quotations used when the area was marked demonstrated                                                                                                                                                                                                      | Allows the summary to cite the evidence that earned credit, rather than a later incomplete reply (DG2)                                  |
+|                                               | `gap`                                  | Missing reasoning or a misconception that remains unresolved                                                                                                                                                                                               | Provides a specific target for the next question or hint (DG3)                                                                          |
+| **SupportLadder**<br>(one per reasoning area) | `attention`                            | A questioning counter used to track unresolved reasoning. Adequate progress can reset it; a first partial attempt can hold it without resetting it                                                                                                         | Helps the policy recognise when further questioning should give way to support. Explicit help requests can advance support sooner (DG1) |
+|                                               | `assistance`                           | Strongest help already given:<br>i. 0 none<br>ii. 1 light hint<br>iii. 2 stronger hint<br>iv. 3 guided explanation                                                                                                                                         | Selects the next support level and preserves assistance history even after progress (DG1)                                               |
+| **Navigation**                                | `focusArea`                            | The reasoning area currently being addressed                                                                                                                                                                                                               | Keeps the response focused on a particular gap (DG3)                                                                                    |
+|                                               | `phase`                                | i. opening<br>ii. exploring<br>iii. paused<br>iv. complete                                                                                                                                                                                                 | Distinguishes completion from a pause with unresolved reasoning                                                                         |
+|                                               | `awaitingCheck`                        | An area explained through guidance that the learner has not yet applied                                                                                                                                                                                    | Prevents a tutor-provided explanation from automatically becoming learner credit (DG2)                                                  |
+|                                               | `deferredAreas`                        | Unresolved areas set aside after the learner could not apply a guided explanation                                                                                                                                                                          | Avoids repeatedly questioning the same unresolved point. The learner can still demonstrate it later (DG1)                               |
+| **Approach**                                  | `selectedApproach.name`, `description` | A label and concrete description of the learner's proposed algorithm                                                                                                                                                                                       | Keeps assessment and support aligned with the learner's own steps (DG3)                                                                 |
+|                                               | `selectedApproach.changedFrom`         | The preceding approach when the learner changes algorithms                                                                                                                                                                                                 | Identifies reasoning that may need reassessment for the new algorithm                                                                   |
+| **Conversation**                              | `messages`                             | Learner and tutor messages, including labels such as question, hint, repair, and summary                                                                                                                                                                   | Supplies conversational context and helps determine whether subsequent evidence followed assistance                                     |
+|                                               | `turn`                                 | The current learner-turn number                                                                                                                                                                                                                            | Supports ordering and exported test records                                                                                             |
 
 Reasoning areas: approach, justification, correctness and complexity are required; requirements and comparison are optional. Edge cases are part of correctness.
 
-Run `npm run build`, `npm run lint`, and `npm run simulate` to check the implementation.
+Run `npm run build`, `npm run lint`, and `npm run simulate` to check the implementation. `npm run simulate` runs offline checks of the policy, evidence and completion rules (`scripts/simulate.ts`); it does not call Claude.
+
+**Final version:** the tutor code has not changed since commit `314a8ad`, which includes the red-team T1 fix (`c6c8bdd`) and T2 refinement. The final-system test conversations (C01–C15) were run on `93b6730`, which contains the same tutor code.
 
 Useful partial answers receive ordinary follow-up questions. Hint escalation depends on confusion or lack of progress, rather than total conversation length. Earlier assistance remains recorded even after the learner starts making progress. Known solutions in `scripts/fixtures/approaches.ts` are offline evaluation material, not part of the live tutoring flow.
 
@@ -85,19 +87,27 @@ The conversations were generated with `scripts/simulate-learners.ts`, which runs
 npx tsx scripts/simulate-learners.ts --persona P2 --id C21 --src <worktree of 41666c4>
 npx tsx scripts/judge.ts --criterion c1 --version v3
 npx tsx scripts/judge.ts --criterion c2 --version v6 --problem-context
-npx tsx scripts/judge.ts --criterion c1,c2 --version v3 --score-only
+npx tsx scripts/judge.ts --criterion c1 --version v3 --score-only
+npx tsx scripts/judge.ts --criterion c2 --version v6 --score-only
 npx tsx scripts/build-results-page.ts
 ```
 
-`--problem-context` gives the judge the problem statement alongside the conversation (required for C2 v5–v6). `--score-only` recomputes agreement from saved verdicts without calling the model. The judge uses the same model as LeetUP.
+`--problem-context` gives the judge the problem statement alongside the conversation (required for C2 v5–v6). `--score-only` recomputes agreement from saved verdicts without calling the model. The judge uses the same model as LeetUP. `simulate-learners.ts` and `judge.ts` (without `--score-only`) call Claude through the local server, so they need the API key and `npm run dev` running. `build-results-page.ts` only reads saved files; open the resulting `llm_judge/results.html` in a browser.
 
 ### Red-teaming (`red_team/`)
 
 - `plan.md`: the two targets, PASS/FAIL rules, all six attempts and the results log for every run.
-- `runs/` and `after-fix/`: exported transcripts before and after the fixes (commits `c6c8bdd` and `314a8ad`).
+- `runs/`: exported transcripts before the target-specific changes (T1 on `fbc95e3` and `fe8063f`, which have identical tutor code; T2-A on `c6c8bdd`).
+- `after-fix/`: exported transcripts after the changes (T1 on `c6c8bdd`, after its fix; T2 on `314a8ad`, after its refinement).
 - `screenshots/`: screenshots of each run in the running system.
 
 ## AI use
 
-Records of my conversations with AI tools for this assignment are in `ai_logs/`.
+Records of my conversations with AI tools for this assignment are in `ai_logs/`:
 
+- `claude-code-llm-judge.md`: building the LLM-judge test set, criteria, judge prompts and results (Claude Code, full session).
+- `claude-code-c2-narrowing.md`: narrowing criterion C2 and adding C21–C23 (Claude Code, excerpt).
+- `claude-code-personas.md`: writing `llm_judge/personas.md` (Claude Code, full session).
+- `claude-code-architecture-diagram.md`: drawing the architecture diagram (Claude Code, excerpt).
+
+I also used ChatGPT to review the wording of the report.
